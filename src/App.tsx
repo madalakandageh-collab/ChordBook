@@ -19,6 +19,7 @@ import { useRoomSync } from './hooks/useRoomSync';
 import { useWakeLock } from './hooks/useWakeLock';
 import type {
   Bar,
+  LastBarCuePassRule,
   LyricSection,
   MetronomeSettings,
   RoomSyncState,
@@ -720,6 +721,74 @@ export default function App() {
               sections: s.sections.filter((sec) => sec.id !== sectionId),
             }));
           }}
+          onUpdateSectionRepeat={(sectionId, patch) => {
+            if (isLocked) return;
+            updateActiveSong((s) => ({
+              ...s,
+              sections: s.sections.map((sec) =>
+                sec.id === sectionId ? { ...sec, ...patch } : sec
+              ),
+            }));
+          }}
+          onMoveSection={(index, direction) => {
+            if (isLocked) return;
+            updateActiveSong((s) => {
+              const targetIdx = index + direction;
+              if (targetIdx < 0 || targetIdx >= s.sections.length) return s;
+              const next = [...s.sections];
+              const [moved] = next.splice(index, 1);
+              next.splice(targetIdx, 0, moved);
+              return { ...s, sections: next };
+            });
+          }}
+          onDuplicateSection={(sectionId) => {
+            if (isLocked) return;
+            updateActiveSong((s) => {
+              const idx = s.sections.findIndex((sec) => sec.id === sectionId);
+              if (idx < 0) return s;
+              const src = s.sections[idx];
+              const uid = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+              const clone = {
+                ...src,
+                id: `sec-${uid}`,
+                bars: src.bars.map((b, bIdx) => ({
+                  ...b,
+                  id: `bar-${uid}-${bIdx}`,
+                  beatChords: b.beatChords ? [...b.beatChords] : undefined,
+                })),
+              };
+              const next = [...s.sections];
+              next.splice(idx + 1, 0, clone);
+              return { ...s, sections: next };
+            });
+          }}
+          onCopyReferenceSection={(sectionId) => {
+            if (isLocked) return;
+            updateActiveSong((s) => {
+              const idx = s.sections.findIndex((sec) => sec.id === sectionId);
+              if (idx < 0) return s;
+              const src = s.sections[idx];
+              const uid = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+              const refBlock = {
+                id: `sec-ref-${uid}`,
+                name: src.name,
+                bars: [],
+                isReference: true,
+                referenceTargetId: src.referenceTargetId || src.id,
+              };
+              const next = [...s.sections];
+              next.splice(idx + 1, 0, refBlock);
+              return { ...s, sections: next };
+            });
+          }}
+          onExportSongProject={() => {
+            const slug =
+              activeSong.title
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-|-$/g, '') || 'chordbook-project';
+            downloadJsonFile({ songs: [activeSong], setlists: [] }, `${slug}-project.json`);
+          }}
           onUpdateSongMeta={(title, artist, key) => {
             if (isLocked) return;
             updateActiveSong((s) => ({ ...s, title, artist, key }));
@@ -890,6 +959,20 @@ export default function App() {
           songTimeSignature={activeSong.timeSignature}
           mode={barEditorMode}
           libraryVersion={cueLibraryVersion}
+          sectionRepeat={Boolean(editingSection.repeat)}
+          sectionRepeatCount={editingSection.repeatCount ?? 2}
+          sectionLastBarCuePassRule={editingSection.lastBarCuePassRule ?? 'all'}
+          isLastBarInSection={
+            editingSection.bars[editingSection.bars.length - 1]?.id === editingBar.id
+          }
+          onUpdateSectionRepeat={(patch: { lastBarCuePassRule?: LastBarCuePassRule }) => {
+            updateActiveSong((s) => ({
+              ...s,
+              sections: s.sections.map((sec) =>
+                sec.id === editingBarTarget.sectionId ? { ...sec, ...patch } : sec
+              ),
+            }));
+          }}
           onUpdateBar={(updatedBar: Bar) => {
             updateActiveSong((s) => ({
               ...s,

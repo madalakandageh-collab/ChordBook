@@ -311,23 +311,25 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
               <Repeat className="w-3.5 h-3.5" />
               <span>Whole song</span>
             </button>
-            {song.sections.map((sec) => {
-              const active = loopSectionId === sec.id;
-              return (
-                <button
-                  key={sec.id}
-                  type="button"
-                  onClick={() => onLoopSectionChange(sec.id)}
-                  className={`px-3.5 py-2 rounded-full border text-xs font-medium transition ${
-                    active
-                      ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
-                      : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-primary)]/85 hover:text-[var(--text-primary)]'
-                  }`}
-                >
-                  {sec.name}
-                </button>
-              );
-            })}
+            {song.sections
+              .filter((sec) => !sec.isReference)
+              .map((sec) => {
+                const active = loopSectionId === sec.id;
+                return (
+                  <button
+                    key={sec.id}
+                    type="button"
+                    onClick={() => onLoopSectionChange(sec.id)}
+                    className={`px-3.5 py-2 rounded-full border text-xs font-medium transition ${
+                      active
+                        ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                        : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-primary)]/85 hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {sec.name}
+                  </button>
+                );
+              })}
           </div>
         </div>
 
@@ -336,38 +338,40 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
           <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase mb-1">
             SECTION KEYS
           </p>
-          {song.sections.map((sec) => {
-            const val = sectionTransposes[sec.id] ?? sec.transpose ?? 0;
-            return (
-              <div
-                key={sec.id}
-                className="rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] px-4 py-2.5 flex items-center justify-between"
-              >
-                <span className="text-sm font-medium text-[var(--text-primary)]">{sec.name}</span>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    disabled={isLocked}
-                    onClick={() => onSectionTransposeChange(sec.id, -1)}
-                    className="w-8 h-8 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] disabled:opacity-40 border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center"
-                  >
-                    −
-                  </button>
-                  <span className="w-5 text-center text-sm font-semibold text-[var(--text-primary)] tabular-nums">
-                    {val > 0 ? `+${val}` : val}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={isLocked}
-                    onClick={() => onSectionTransposeChange(sec.id, 1)}
-                    className="w-8 h-8 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] disabled:opacity-40 border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center"
-                  >
-                    +
-                  </button>
+          {song.sections
+            .filter((sec) => !sec.isReference)
+            .map((sec) => {
+              const val = sectionTransposes[sec.id] ?? sec.transpose ?? 0;
+              return (
+                <div
+                  key={sec.id}
+                  className="rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] px-4 py-2.5 flex items-center justify-between"
+                >
+                  <span className="text-sm font-medium text-[var(--text-primary)]">{sec.name}</span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => onSectionTransposeChange(sec.id, -1)}
+                      className="w-8 h-8 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] disabled:opacity-40 border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center"
+                    >
+                      −
+                    </button>
+                    <span className="w-5 text-center text-sm font-semibold text-[var(--text-primary)] tabular-nums">
+                      {val > 0 ? `+${val}` : val}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => onSectionTransposeChange(sec.id, 1)}
+                      className="w-8 h-8 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] disabled:opacity-40 border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
       </div>
     </div>

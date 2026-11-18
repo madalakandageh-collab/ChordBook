@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {
@@ -145,4 +146,72 @@ input[type='range'].amber-slider::-moz-range-thumb {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
+}
+
+/* Printable / PDF Chord Sheet (@media print A4 2-column layout) */
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+.pdf-title-highlight {
+  display: inline-block;
+  padding: 0 6px 2px;
+  background: linear-gradient(transparent 58%, #FEF08A 58%, #FEF08A 92%, transparent 92%);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.pdf-two-column-flow {
+  column-count: 2;
+  column-gap: 18px;
+}
+
+.pdf-section-block {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: 14px;
+}
+
+@media print {
+  html,
+  body {
+    background: #FFFFFF !important;
+    color: #111827 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.printing-chord-sheet #root {
+    display: none !important;
+  }
+
+  body.printing-chord-sheet .print-modal-wrapper {
+    position: static !important;
+    inset: auto !important;
+    background: #FFFFFF !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  body.printing-chord-sheet .print-sheet-paper {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body.printing-chord-sheet .no-print {
+    display: none !important;
+  }
+
+  .pdf-two-column-flow {
+    column-count: 2 !important;
+    column-gap: 18px !important;
+  }
 }

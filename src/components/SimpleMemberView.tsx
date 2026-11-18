@@ -232,9 +232,27 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
         {tab === 'chords' ? (
           <div className="space-y-4">
             {activeSong.sections.map((section) => {
+              if (section.isReference) {
+                return (
+                  <section
+                    key={section.id}
+                    className="rounded-3xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-panel)] px-4 sm:px-5 py-3 flex items-center justify-between"
+                  >
+                    <h2 className="font-serif-display text-[19px] font-bold text-[var(--text-primary)]">
+                      ({section.name})
+                    </h2>
+                    <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">
+                      Reference
+                    </span>
+                  </section>
+                );
+              }
+
               const secTranspose =
                 globalTranspose + (sectionTransposes[section.id] ?? section.transpose ?? 0);
               const isSectionPlaying = isPlaying && activeSectionId === section.id;
+              const isRepeatOn = Boolean(section.repeat);
+              const repeatCount = Math.max(2, section.repeatCount ?? 2);
 
               return (
                 <section
@@ -245,27 +263,36 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
                       : 'bg-[var(--bg-panel)] border-[var(--border-subtle)] shadow-xs'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <h2
-                      className={`font-serif-display text-[22px] font-bold ${
-                        isSectionPlaying
-                          ? 'text-[var(--accent-amber-text)]'
-                          : 'text-[var(--text-primary)]'
-                      }`}
-                    >
-                      {section.name}
-                    </h2>
-                    <span className="text-xs text-[var(--text-muted)] tabular-nums">
+                  <div className="flex items-center justify-between mb-3 gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h2
+                        className={`font-serif-display text-[22px] font-bold truncate ${
+                          isSectionPlaying
+                            ? 'text-[var(--accent-amber-text)]'
+                            : 'text-[var(--text-primary)]'
+                        }`}
+                      >
+                        {section.name}
+                      </h2>
+                      {isRepeatOn && (
+                        <span className="px-2 py-0.5 rounded-full bg-[var(--accent-amber-tint)] border border-[#E5A958]/60 text-[11px] font-bold text-[var(--accent-amber-text)] tabular-nums shrink-0">
+                          ||: :|| ×{repeatCount}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-[var(--text-muted)] tabular-nums shrink-0">
                       {activeSong.timeSignature}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-4 gap-2.5">
-                    {section.bars.map((bar) => {
+                    {section.bars.map((bar, barIdx) => {
                       const barNum = runningBarNum + 1;
                       const repeats = bar.repeat && bar.repeat > 1 ? bar.repeat : 1;
                       runningBarNum += repeats;
 
+                      const isFirstInRepeat = isRepeatOn && barIdx === 0;
+                      const isLastInRepeat = isRepeatOn && barIdx === section.bars.length - 1;
                       const isActive = isPlaying && activeBarId === bar.id;
                       const isSplit = hasBeatSplits(bar);
                       const chordText = formatBarChordsSummary(bar, secTranspose, displayKey);
@@ -280,12 +307,20 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
                               : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)]'
                           }`}
                         >
-                          <span className="absolute top-2 left-2.5 text-[11px] text-[var(--text-subtle)] tabular-nums">
-                            {barNum}
+                          <span className="absolute top-2 left-2.5 flex items-center gap-1 text-[11px] text-[var(--text-subtle)] tabular-nums">
+                            <span>{barNum}</span>
+                            {isFirstInRepeat && (
+                              <span className="font-mono text-[11px] font-bold text-[var(--accent-amber-text)]">
+                                ||:
+                              </span>
+                            )}
                           </span>
-                          {repeats > 1 && (
-                            <span className="absolute top-2 right-2 text-[10px] font-semibold text-[var(--accent-amber-text)] tabular-nums">
-                              ×{repeats}
+                          {(repeats > 1 || isLastInRepeat) && (
+                            <span className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-semibold text-[var(--accent-amber-text)] tabular-nums">
+                              {repeats > 1 && <span>×{repeats}</span>}
+                              {isLastInRepeat && (
+                                <span className="font-mono text-[11px] font-bold">:||</span>
+                              )}
                             </span>
                           )}
                           <span

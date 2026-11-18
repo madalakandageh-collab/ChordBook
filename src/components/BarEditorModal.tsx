@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
-import { SplitSquareHorizontal, Trash2, Volume2, X } from 'lucide-react';
-import type { Bar, BarMeter, BeatUnit, CustomVoiceCue } from '../types';
-import { formatChordDisplay, hasBeatSplits, parseMeterBeats } from '../utils/chords';
+import { Repeat, SplitSquareHorizontal, Trash2, Volume2, X } from 'lucide-react';
+import type { Bar, BarMeter, BeatUnit, CustomVoiceCue, LastBarCuePassRule } from '../types';
+import {
+  formatChordDisplay,
+  formatPassOrdinal,
+  hasBeatSplits,
+  parseMeterBeats,
+} from '../utils/chords';
 import { BUNDLED_VOICE_CUES } from '../utils/voiceCues';
 import { CuePointLibrary } from './CuePointLibrary';
 
@@ -15,6 +20,11 @@ interface BarEditorModalProps {
   songTimeSignature: string;
   mode: BarEditorMode;
   libraryVersion?: number;
+  sectionRepeat?: boolean;
+  sectionRepeatCount?: number;
+  sectionLastBarCuePassRule?: LastBarCuePassRule;
+  isLastBarInSection?: boolean;
+  onUpdateSectionRepeat?: (patch: { lastBarCuePassRule?: LastBarCuePassRule }) => void;
   onUpdateBar: (updated: Bar) => void;
   onRemoveBar: () => void;
   onPreviewBundledCue: (url: string) => void;
@@ -57,6 +67,11 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
   songTimeSignature,
   mode,
   libraryVersion,
+  sectionRepeat,
+  sectionRepeatCount = 2,
+  sectionLastBarCuePassRule = 'all',
+  isLastBarInSection,
+  onUpdateSectionRepeat,
   onUpdateBar,
   onRemoveBar,
   onPreviewBundledCue,
@@ -504,6 +519,76 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                   />
                 </button>
               </div>
+
+              {/* Last-Bar Voice Count / Cue Playback Pass Rule (for repeated sections) */}
+              {isLastBarInSection && sectionRepeat && onUpdateSectionRepeat && (
+                <div className="rounded-2xl bg-[var(--bg-recessed)] border border-[#E5A958]/40 p-4 space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <Repeat className="w-3.5 h-3.5 text-[var(--accent-amber-text)] shrink-0" />
+                    <p className="text-[11px] font-medium tracking-[0.18em] text-[var(--accent-amber-text)] uppercase">
+                      LAST-BAR VOICE COUNT / CUE PLAYBACK (×{Math.max(2, sectionRepeatCount)})
+                    </p>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Choose which repeat pass triggers this bar&apos;s voice cue &amp; spoken count:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => onUpdateSectionRepeat({ lastBarCuePassRule: 'all' })}
+                      className={`px-3 py-1.5 rounded-full border text-xs font-medium transition ${
+                        sectionLastBarCuePassRule === 'all'
+                          ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                          : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)]'
+                      }`}
+                    >
+                      All times
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onUpdateSectionRepeat({ lastBarCuePassRule: 'first' })}
+                      className={`px-3 py-1.5 rounded-full border text-xs font-medium transition ${
+                        sectionLastBarCuePassRule === 'first' || sectionLastBarCuePassRule === 1
+                          ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                          : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)]'
+                      }`}
+                    >
+                      1st time only
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onUpdateSectionRepeat({ lastBarCuePassRule: 'last' })}
+                      className={`px-3 py-1.5 rounded-full border text-xs font-medium transition ${
+                        sectionLastBarCuePassRule === 'last' ||
+                        sectionLastBarCuePassRule === Math.max(2, sectionRepeatCount)
+                          ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                          : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)]'
+                      }`}
+                    >
+                      {Math.max(2, sectionRepeatCount) === 2
+                        ? '2nd time only (Last time)'
+                        : `${formatPassOrdinal(Math.max(2, sectionRepeatCount))} time only (Last time)`}
+                    </button>
+                    {Math.max(2, sectionRepeatCount) > 2 &&
+                      Array.from({ length: Math.max(2, sectionRepeatCount) }, (_, i) => i + 1)
+                        .filter((p) => p > 1 && p < Math.max(2, sectionRepeatCount))
+                        .map((passNum) => (
+                          <button
+                            key={passNum}
+                            type="button"
+                            onClick={() => onUpdateSectionRepeat({ lastBarCuePassRule: passNum })}
+                            className={`px-3 py-1.5 rounded-full border text-xs font-medium tabular-nums transition ${
+                              sectionLastBarCuePassRule === passNum
+                                ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                                : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)]'
+                            }`}
+                          >
+                            {formatPassOrdinal(passNum)} pass
+                          </button>
+                        ))}
+                  </div>
+                </div>
+              )}
 
               {/* COUNTING SYSTEM */}
               <div>

@@ -229,23 +229,25 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
           JUMP TO SECTION
         </p>
         <div className="flex flex-wrap gap-2">
-          {activeSong.sections.map((sec) => {
-            const isCurrentSec = currentStep?.sectionId === sec.id;
-            return (
-              <button
-                key={sec.id}
-                type="button"
-                onClick={() => onSeekToSection(sec.id)}
-                className={`px-3.5 py-2 rounded-full border text-xs font-medium transition ${
-                  isCurrentSec
-                    ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
-                    : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-primary)]/85 hover:bg-[var(--bg-elevated)]'
-                }`}
-              >
-                {sec.name}
-              </button>
-            );
-          })}
+          {activeSong.sections
+            .filter((sec) => !sec.isReference)
+            .map((sec) => {
+              const isCurrentSec = currentStep?.sectionId === sec.id;
+              return (
+                <button
+                  key={sec.id}
+                  type="button"
+                  onClick={() => onSeekToSection(sec.id)}
+                  className={`px-3.5 py-2 rounded-full border text-xs font-medium transition ${
+                    isCurrentSec
+                      ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                      : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-primary)]/85 hover:bg-[var(--bg-elevated)]'
+                  }`}
+                >
+                  {sec.name}
+                </button>
+              );
+            })}
         </div>
       </div>
     </div>

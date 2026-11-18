@@ -1,5 +1,5 @@
 import type { CustomVoiceCue, MetronomeSettings, TimelineBar } from '../types';
-import { hasBeatSplits } from '../utils/chords';
+import { hasBeatSplits, shouldTriggerBarVoiceCueAndCount } from '../utils/chords';
 import {
   BUNDLED_COUNT_CUES,
   BUNDLED_VOICE_CUES,
@@ -659,12 +659,14 @@ export class ChordbookAudioEngine {
         this.playChord(scheduledTime, currentStep.bar.chord, totalTranspose, beatDurationSec * beatsInBar);
       }
 
-      if (beatNum === 1 && (currentStep.bar.cue || currentStep.bar.customCueId)) {
+      const allowLastBarVoice = shouldTriggerBarVoiceCueAndCount(currentStep);
+
+      if (allowLastBarVoice && beatNum === 1 && (currentStep.bar.cue || currentStep.bar.customCueId)) {
         this.scheduleVoiceCue(scheduledTime, currentStep.bar.cue, currentStep.bar.customCueId);
       }
 
       // Play spoken MP3 counts 1-7 when Voice count is locked to this bar
-      if (currentStep.bar.voiceCountLocked) {
+      if (allowLastBarVoice && currentStep.bar.voiceCountLocked) {
         const countPattern = (currentStep.bar.countingSystem || '1 1 1 1')
           .trim()
           .split(/[\s,]+/)

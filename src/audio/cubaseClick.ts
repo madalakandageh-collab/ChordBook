@@ -7,7 +7,12 @@ import type {
   Song,
   TimelineBar,
 } from '../types';
-import { buildSongTimeline, chordToMidiNotes, hasBeatSplits } from '../utils/chords';
+import {
+  buildSongTimeline,
+  chordToMidiNotes,
+  hasBeatSplits,
+  shouldTriggerBarVoiceCueAndCount,
+} from '../utils/chords';
 import {
   getCustomVoiceCue,
   resolveBundledCueUrl,
@@ -394,8 +399,10 @@ export async function renderSongAudioOffline(options: {
       continue;
     }
 
+    const allowLastBarVoice = shouldTriggerBarVoiceCueAndCount(ev.step);
+
     // 2. Bar beat 1 voice cue (bundled or custom recorded/imported)
-    if (ev.beatNum === 1) {
+    if (allowLastBarVoice && ev.beatNum === 1) {
       if (ev.step.bar.customCueId) {
         scheduleVoiceBuffer(customBuffers.get(ev.step.bar.customCueId), ev.time);
       } else if (ev.step.bar.cue) {
@@ -405,7 +412,7 @@ export async function renderSongAudioOffline(options: {
     }
 
     // 3. Locked Bar Counting System 1..7 MP3
-    if (ev.step.bar.voiceCountLocked) {
+    if (allowLastBarVoice && ev.step.bar.voiceCountLocked) {
       const pattern = (ev.step.bar.countingSystem || '1 1 1 1')
         .trim()
         .split(/[\s,]+/)

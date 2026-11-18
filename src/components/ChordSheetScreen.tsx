@@ -5,15 +5,24 @@ import {
   Copy,
   Edit3,
   FileAudio,
+  FileText,
+  FolderDown,
+  ListOrdered,
   MoreVertical,
   Play,
   Plus,
+  Repeat,
+  Trash2,
   X,
 } from 'lucide-react';
-import type { Bar, LyricSection, Section, Song, TimeSignature } from '../types';
+import type { Bar, LastBarCuePassRule, LyricSection, Section, Song, TimeSignature } from '../types';
 import type { BarEditorMode } from './BarEditorModal';
+import { ArrangeSectionsModal } from './ArrangeSectionsModal';
+import { PrintableChordSheetModal } from './PrintableChordSheetModal';
 import {
   formatBarChordsSummary,
+  formatLastBarCuePassPrintBadge,
+  formatPassOrdinal,
   getSongTotalBars,
   hasBeatSplits,
   parseMeterBeats,
@@ -42,6 +51,18 @@ interface ChordSheetScreenProps {
   onAddSection: (name: string) => void;
   onRenameSection: (sectionId: string, newName: string) => void;
   onDeleteSection: (sectionId: string) => void;
+  onUpdateSectionRepeat: (
+    sectionId: string,
+    patch: {
+      repeat?: boolean;
+      repeatCount?: number;
+      lastBarCuePassRule?: LastBarCuePassRule;
+    }
+  ) => void;
+  onMoveSection: (index: number, direction: -1 | 1) => void;
+  onDuplicateSection: (sectionId: string) => void;
+  onCopyReferenceSection: (sectionId: string) => void;
+  onExportSongProject: () => void;
   onUpdateSongMeta: (title: string, artist: string, key: string) => void;
   onUpdateLyrics: (lyrics: LyricSection[]) => void;
   onDeleteSong: () => void;
@@ -67,15 +88,22 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
   onAddSection,
   onRenameSection,
   onDeleteSection,
+  onUpdateSectionRepeat,
+  onMoveSection,
+  onDuplicateSection,
+  onCopyReferenceSection,
+  onExportSongProject,
   onUpdateSongMeta,
   onUpdateLyrics,
   onDeleteSong,
 }) => {
   const [tab, setTab] = useState<'chords' | 'lyrics'>('chords');
   const [showSongMenu, setShowSongMenu] = useState(false);
-  const [copiedToast, setCopiedToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [activeSectionMenuId, setActiveSectionMenuId] = useState<string | null>(null);
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);
+  const [showArrangeModal, setShowArrangeModal] = useState(false);
+  const [showPrintSheetModal, setShowPrintSheetModal] = useState(false);
   const [newSectionName, setNewSectionName] = useState('');
   const [renamingSection, setRenamingSection] = useState<{ id: string; name: string } | null>(null);
   const [showEditMetaModal, setShowEditMetaModal] = useState(false);
@@ -84,6 +112,11 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
   const [editKey, setEditKey] = useState(song.key);
   const [showLyricsEditor, setShowLyricsEditor] = useState(false);
   const [lyricsDraftText, setLyricsDraftText] = useState('');
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage((cur) => (cur === msg ? null : cur)), 2600);
+  };
 
   const handleCopyJsonTemplate = async () => {
     try {
@@ -96,8 +129,7 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
       document.execCommand('copy');
       document.body.removeChild(ta);
     }
-    setCopiedToast(true);
-    setTimeout(() => setCopiedToast(false), 2600);
+    showToast('Song JSON Template copied to clipboard');
   };
 
   const activeBarRef = useRef<HTMLButtonElement | null>(null);
@@ -272,10 +304,10 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
         </div>
       </div>
 
-      {copiedToast && (
+      {toastMessage && (
         <div className="mt-3 px-4 py-2 rounded-xl bg-[var(--accent-amber-tint)] border border-[#E5A958]/50 text-xs text-[var(--accent-amber-text)] flex items-center gap-2">
-          <Check className="w-3.5 h-3.5" />
-          <span>Song JSON Template copied to clipboard</span>
+          <Check className="w-3.5 h-3.5 shrink-0" />
+          <span>{toastMessage}</span>
         </div>
       )}
 
@@ -438,11 +470,71 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
       {tab === 'chords' ? (
         <div className="mt-5 space-y-4">
           {song.sections.map((section: Section) => {
+            if (section.isReference) {
+              const targetSection = song.sections.find(
+                (s) =>
+                  !s.isReference &&
+                  (s.id === section.referenceTargetId ||
+                    s.name.toLowerCase() === section.name.toLowerCase())
+              );
+              return (
+                <section
+                  key={section.id}
+                  className="rounded-3xl bg-[var(--bg-panel)] border border-dashed border-[var(--border-subtle)] px-4 sm:px-5 py-3.5 flex items-center justify-between gap-3 shadow-xs"
+                >
+                  <div className="min-w-0">
+                    <h2 className="font-serif-display text-[19px] font-bold text-[var(--text-primary)] truncate">
+                      ({section.name})
+                    </h2>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Reference block · plays without duplicating bars
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {targetSection && (
+                      <button
+                        type="button"
+                        onClick={() => onPlaySection(targetSection.id)}
+                        aria-label={`Play ${section.name}`}
+                        className="w-9 h-9 rounded-full hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--accent-amber-text)] flex items-center justify-center transition"
+                      >
+                        <Play className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => onDeleteSection(section.id)}
+                      aria-label={`Delete reference ${section.name}`}
+                      className="w-9 h-9 rounded-full hover:bg-red-500/10 disabled:opacity-35 text-red-500 flex items-center justify-center transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </section>
+              );
+            }
+
             const secBarCount = section.bars.reduce(
               (acc, b) => acc + (b.repeat && b.repeat > 1 ? b.repeat : 1),
               0
             );
             const secTranspose = (song.transpose || 0) + (section.transpose || 0);
+            const isRepeatOn = Boolean(section.repeat);
+            const repeatCount = Math.max(2, section.repeatCount ?? 2);
+            const passRule = section.lastBarCuePassRule ?? 'all';
+            const passPrintBadge = isRepeatOn
+              ? formatLastBarCuePassPrintBadge(passRule, repeatCount)
+              : null;
+
+            const selectRuleValue =
+              passRule === 'all'
+                ? 'all'
+                : passRule === 'first' || passRule === 1
+                ? 'first'
+                : passRule === 'last' || passRule === repeatCount
+                ? 'last'
+                : String(passRule);
 
             return (
               <section
@@ -451,9 +543,16 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h2 className="font-serif-display text-[22px] font-bold text-[var(--text-primary)]">
-                      {section.name}
-                    </h2>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="font-serif-display text-[22px] font-bold text-[var(--text-primary)]">
+                        {section.name}
+                      </h2>
+                      {isRepeatOn && (
+                        <span className="px-2 py-0.5 rounded-full bg-[var(--accent-amber-tint)] border border-[#E5A958]/60 text-[11px] font-bold text-[var(--accent-amber-text)] tabular-nums">
+                          ||: :|| ×{repeatCount}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[13px] text-[var(--text-muted)] mt-0.5 tabular-nums">
                       {song.bpm} bpm · {song.timeSignature} · {secBarCount}{' '}
                       {secBarCount === 1 ? 'bar' : 'bars'}
@@ -498,7 +597,7 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                           className="fixed inset-0 z-30"
                           onClick={() => setActiveSectionMenuId(null)}
                         />
-                        <div className="absolute right-0 top-10 z-40 w-40 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xl py-1.5 text-sm">
+                        <div className="absolute right-0 top-10 z-40 w-44 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xl py-1.5 text-sm">
                           <button
                             type="button"
                             onClick={() => {
@@ -509,6 +608,27 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                           >
                             Rename section
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveSectionMenuId(null);
+                              onDuplicateSection(section.id);
+                            }}
+                            className="w-full px-3.5 py-2 text-left hover:bg-[var(--bg-elevated)] text-[var(--text-primary)]"
+                          >
+                            Duplicate section
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveSectionMenuId(null);
+                              onCopyReferenceSection(section.id);
+                            }}
+                            className="w-full px-3.5 py-2 text-left hover:bg-[var(--bg-elevated)] text-[var(--text-primary)]"
+                          >
+                            Copy reference
+                          </button>
+                          <div className="my-1 border-t border-[var(--border-subtle)]" />
                           <button
                             type="button"
                             onClick={() => {
@@ -527,10 +647,13 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
 
                 {/* 4-column Bar Grid */}
                 <div className="mt-4 grid grid-cols-4 gap-2.5">
-                  {section.bars.map((bar: Bar) => {
+                  {section.bars.map((bar: Bar, barIdx: number) => {
                     const barNum = runningBarNum + 1;
                     const repeats = bar.repeat && bar.repeat > 1 ? bar.repeat : 1;
                     runningBarNum += repeats;
+
+                    const isFirstInRepeat = isRepeatOn && barIdx === 0;
+                    const isLastInRepeat = isRepeatOn && barIdx === section.bars.length - 1;
 
                     const isBarActive = isPlaying && activeBarId === bar.id;
                     const isSplit = hasBeatSplits(bar);
@@ -549,13 +672,23 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                             : 'bg-[var(--bg-recessed)] hover:bg-[var(--bg-bar-hover)] border-[var(--border-subtle)]'
                         } disabled:cursor-default`}
                       >
-                        <span className="absolute top-2 left-2.5 text-[11px] font-medium text-[var(--text-subtle)] tabular-nums">
-                          {barNum}
+                        <span className="absolute top-2 left-2.5 flex items-center gap-1 text-[11px] font-medium text-[var(--text-subtle)] tabular-nums">
+                          <span>{barNum}</span>
+                          {isFirstInRepeat && (
+                            <span className="font-mono text-[11px] font-bold text-[var(--accent-amber-text)]">
+                              ||:
+                            </span>
+                          )}
                         </span>
 
-                        {repeats > 1 && (
-                          <span className="absolute top-2 right-2 text-[10px] font-semibold text-[var(--accent-amber-text)] tabular-nums">
-                            ×{repeats}
+                        {(repeats > 1 || isLastInRepeat) && (
+                          <span className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-semibold text-[var(--accent-amber-text)] tabular-nums">
+                            {repeats > 1 && <span>×{repeats}</span>}
+                            {isLastInRepeat && (
+                              <span className="font-mono text-[11px] font-bold">
+                                :||
+                              </span>
+                            )}
                           </span>
                         )}
 
@@ -578,6 +711,7 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                         {(bar.cue || bar.voiceCountLocked) && (
                           <span className="text-[10px] text-[var(--accent-amber-text)] mt-0.5 truncate max-w-full">
                             {bar.cue ? bar.cue : 'count'}
+                            {isLastInRepeat && passPrintBadge ? ` ${passPrintBadge}` : ''}
                           </span>
                         )}
 
@@ -590,20 +724,175 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                     );
                   })}
                 </div>
+
+                {/* Per-Section Repeat ||: :|| Control & Last-Bar Voice Count Selector */}
+                <div className="mt-3.5 pt-3 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() =>
+                        onUpdateSectionRepeat(section.id, {
+                          repeat: !isRepeatOn,
+                          repeatCount: !isRepeatOn
+                            ? Math.max(2, section.repeatCount ?? 2)
+                            : section.repeatCount,
+                          lastBarCuePassRule: section.lastBarCuePassRule ?? 'all',
+                        })
+                      }
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition disabled:opacity-40 ${
+                        isRepeatOn
+                          ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                          : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                      }`}
+                    >
+                      <Repeat className="w-3.5 h-3.5" />
+                      <span>Repeat ||: :||</span>
+                    </button>
+
+                    {isRepeatOn && (
+                      <div className="inline-flex items-center gap-1 px-1.5 py-1 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)]">
+                        <button
+                          type="button"
+                          disabled={isLocked || repeatCount <= 2}
+                          onClick={() => {
+                            const next = Math.max(2, repeatCount - 1);
+                            const nextRule =
+                              typeof passRule === 'number' && passRule > next ? 'last' : passRule;
+                            onUpdateSectionRepeat(section.id, {
+                              repeatCount: next,
+                              lastBarCuePassRule: nextRule,
+                            });
+                          }}
+                          aria-label="Decrease section repeats"
+                          className="w-6 h-6 rounded-lg hover:bg-[var(--bg-elevated)] disabled:opacity-35 text-[var(--text-primary)] text-xs font-bold flex items-center justify-center"
+                        >
+                          −
+                        </button>
+                        <span className="px-1.5 text-xs font-bold text-[var(--accent-amber-text)] tabular-nums">
+                          ×{repeatCount}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={isLocked || repeatCount >= 8}
+                          onClick={() =>
+                            onUpdateSectionRepeat(section.id, {
+                              repeatCount: Math.min(8, repeatCount + 1),
+                            })
+                          }
+                          aria-label="Increase section repeats"
+                          className="w-6 h-6 rounded-lg hover:bg-[var(--bg-elevated)] disabled:opacity-35 text-[var(--text-primary)] text-xs font-bold flex items-center justify-center"
+                        >
+                          +
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {isRepeatOn && (
+                    <div className="flex items-center gap-2 min-w-0 max-w-full">
+                      <label
+                        htmlFor={`pass-rule-${section.id}`}
+                        className="text-[10px] font-medium tracking-[0.14em] uppercase text-[var(--text-muted)] whitespace-nowrap"
+                      >
+                        Last-bar cue
+                      </label>
+                      <select
+                        id={`pass-rule-${section.id}`}
+                        disabled={isLocked}
+                        value={selectRuleValue}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const nextRule: LastBarCuePassRule =
+                            val === 'all' || val === 'first' || val === 'last'
+                              ? val
+                              : Number(val);
+                          onUpdateSectionRepeat(section.id, {
+                            lastBarCuePassRule: nextRule,
+                          });
+                        }}
+                        className="h-8 px-2.5 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] focus:border-[#E5A958] focus:outline-none disabled:opacity-45"
+                      >
+                        <option value="all">All times</option>
+                        <option value="first">1st time only</option>
+                        <option value="last">
+                          {repeatCount === 2
+                            ? '2nd time only (Last time)'
+                            : `${formatPassOrdinal(repeatCount)} time only (Last time)`}
+                        </option>
+                        {repeatCount > 2 &&
+                          Array.from({ length: repeatCount }, (_, i) => i + 1)
+                            .filter((p) => p > 1 && p < repeatCount)
+                            .map((passNum) => (
+                              <option key={passNum} value={String(passNum)}>
+                                {formatPassOrdinal(passNum)} pass only
+                              </option>
+                            ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
               </section>
             );
           })}
 
-          {!isLocked && (
-            <button
-              type="button"
-              onClick={() => setShowAddSectionModal(true)}
-              className="w-full py-3.5 rounded-2xl border border-dashed border-[var(--border-subtle)] hover:border-[#E5A958]/70 text-sm font-medium text-[var(--text-muted)] hover:text-[var(--accent-amber-text)] flex items-center justify-center gap-2 transition"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add section</span>
-            </button>
-          )}
+          {/* Bottom Controls UI (2-column Add section + Arrange (N), then 3-column PDF / Audio / Project) */}
+          <div className="pt-1 space-y-2.5">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                disabled={isLocked}
+                onClick={() => setShowAddSectionModal(true)}
+                className="h-12 px-4 rounded-2xl border border-dashed border-[var(--border-subtle)] hover:border-[#E5A958]/70 disabled:opacity-40 text-sm font-medium text-[var(--text-muted)] hover:text-[var(--accent-amber-text)] flex items-center justify-center gap-2 transition"
+              >
+                <Plus className="w-4 h-4 shrink-0" />
+                <span className="whitespace-nowrap">Add section</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowArrangeModal(true)}
+                className="h-12 px-4 rounded-2xl bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-sm font-semibold text-[var(--text-primary)] flex items-center justify-center gap-2 transition shadow-xs"
+              >
+                <ListOrdered className="w-4 h-4 text-[var(--accent-amber-text)] shrink-0" />
+                <span className="whitespace-nowrap tabular-nums">
+                  Arrange ({song.sections.length})
+                </span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowPrintSheetModal(true)}
+                className="h-12 px-3 rounded-2xl bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs sm:text-sm font-semibold text-[var(--text-primary)] flex items-center justify-center gap-2 transition shadow-xs"
+              >
+                <FileText className="w-4 h-4 text-[#E5A958] shrink-0" />
+                <span className="whitespace-nowrap">PDF sheet</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onOpenExportAudio}
+                className="h-12 px-3 rounded-2xl bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs sm:text-sm font-semibold text-[var(--text-primary)] flex items-center justify-center gap-2 transition shadow-xs"
+              >
+                <FileAudio className="w-4 h-4 text-[#E5A958] shrink-0" />
+                <span className="whitespace-nowrap">Audio track</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onExportSongProject();
+                  showToast('Song Project JSON exported');
+                }}
+                className="h-12 px-3 rounded-2xl bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs sm:text-sm font-semibold text-[var(--text-primary)] flex items-center justify-center gap-2 transition shadow-xs"
+              >
+                <FolderDown className="w-4 h-4 text-[#E5A958] shrink-0" />
+                <span className="whitespace-nowrap">Project</span>
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
         /* LYRICS TAB */
@@ -859,6 +1148,28 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
             </button>
           </form>
         </div>
+      )}
+      {/* Arrange Sections Modal / Drawer */}
+      {showArrangeModal && (
+        <ArrangeSectionsModal
+          songTitle={song.title}
+          sections={song.sections}
+          isLocked={isLocked}
+          onMoveSection={onMoveSection}
+          onDuplicateSection={onDuplicateSection}
+          onCopyReferenceSection={onCopyReferenceSection}
+          onUpdateSectionRepeat={onUpdateSectionRepeat}
+          onDeleteSection={onDeleteSection}
+          onClose={() => setShowArrangeModal(false)}
+        />
+      )}
+
+      {/* Printable / PDF Chord Sheet Modal */}
+      {showPrintSheetModal && (
+        <PrintableChordSheetModal
+          song={song}
+          onClose={() => setShowPrintSheetModal(false)}
+        />
       )}
     </div>
   );

@@ -52,11 +52,18 @@ export interface SerializedVoiceCue {
   createdAt: number;
 }
 
+export type LastBarCuePassRule = 'all' | 'first' | 'last' | number;
+
 export interface Section {
   id: string;
   name: string;
   bars: Bar[];
   transpose?: number;
+  repeat?: boolean;
+  repeatCount?: number; // default 2 when repeat is true
+  lastBarCuePassRule?: LastBarCuePassRule; // default 'all'
+  isReference?: boolean;
+  referenceTargetId?: string;
 }
 
 export interface LyricSection {
@@ -139,4 +146,8 @@ export interface TimelineBar {
   effectiveMeter: BarMeter;
   beatsPerBar: number;
   sectionTranspose: number;
+  sectionPass?: number;
+  sectionTotalPasses?: number;
+  isLastBarOfSection?: boolean;
+  lastBarCuePassRule?: LastBarCuePassRule;
 }

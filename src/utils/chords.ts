@@ -1,4 +1,4 @@
-import type { Bar, BarMeter, Song, TimelineBar } from '../types';
+import type { Bar, BarMeter, LastBarCuePassRule, Song, TimelineBar } from '../types';
 
 const SHARP_SCALE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FLAT_SCALE = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -101,9 +101,76 @@ export function parseMeterBeats(meter: BarMeter | string): number {
   return num;
 }
 
+export function formatPassOrdinal(pass: number): string {
+  const mod100 = pass % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${pass}th`;
+  switch (pass % 10) {
+    case 1:
+      return `${pass}st`;
+    case 2:
+      return `${pass}nd`;
+    case 3:
+      return `${pass}rd`;
+    default:
+      return `${pass}th`;
+  }
+}
+
+export function formatLastBarCuePassRuleLabel(
+  rule: LastBarCuePassRule | undefined,
+  repeatCount = 2
+): string {
+  if (!rule || rule === 'all') return 'All times';
+  if (rule === 'first' || rule === 1) return '1st time only';
+  if (rule === 'last') {
+    return repeatCount <= 2
+      ? '2nd time only (Last time)'
+      : `${formatPassOrdinal(repeatCount)} time only (Last time)`;
+  }
+  if (typeof rule === 'number') {
+    return rule === repeatCount
+      ? `${formatPassOrdinal(rule)} time only (Last time)`
+      : `${formatPassOrdinal(rule)} time only`;
+  }
+  return 'All times';
+}
+
+export function formatLastBarCuePassPrintBadge(
+  rule: LastBarCuePassRule | undefined,
+  repeatCount = 2
+): string | null {
+  if (!rule || rule === 'all') return null;
+  if (rule === 'first' || rule === 1) return '(1st x)';
+  if (rule === 'last') {
+    return repeatCount <= 2 ? '(2nd x)' : '(Last time)';
+  }
+  if (typeof rule === 'number') {
+    return `(${formatPassOrdinal(rule)} x)`;
+  }
+  return null;
+}
+
+export function shouldTriggerBarVoiceCueAndCount(step: TimelineBar): boolean {
+  if (!step.isLastBarOfSection || (step.sectionTotalPasses ?? 1) <= 1) {
+    return true;
+  }
+  const pass = step.sectionPass ?? 1;
+  const total = step.sectionTotalPasses ?? 2;
+  const rule = step.lastBarCuePassRule ?? 'all';
+  if (rule === 'all') return true;
+  if (rule === 'first') return pass === 1;
+  if (rule === 'last') return pass === total;
+  if (typeof rule === 'number') return pass === rule;
+  return true;
+}
+
 export function getSongTotalBars(song: Song): number {
   return song.sections.reduce((acc, sec) => {
-    const secTotal = sec.bars.reduce((bAcc, bar) => bAcc + (bar.repeat && bar.repeat > 1 ? bar.repeat : 1), 0);
+    if (sec.isReference || sec.bars.length === 0) return acc;
+    const secTotal = sec.bars.reduce(
+      (bAcc, bar) => bAcc + (bar.repeat && bar.repeat > 1 ? bar.repeat : 1),
+      0
+    );
     return acc + secTotal;
   }, 0);
 }
@@ -117,32 +184,56 @@ export function buildSongTimeline(
   let displayBarCounter = 0;
 
   for (const section of song.sections) {
+    if (section.isReference || section.bars.length === 0) {
+      continue;
+    }
+
     const secTranspose = sectionTransposes[section.id] ?? section.transpose ?? 0;
-    for (const bar of section.bars) {
-      const repeats = bar.repeat && bar.repeat > 1 ? bar.repeat : 1;
-      for (let r = 1; r <= repeats; r++) {
-        displayBarCounter += 1;
-        if (loopSectionId && section.id !== loopSectionId) {
-          continue;
+    const sectionStartBarNum = displayBarCounter + 1;
+    const sectionPasses = section.repeat ? Math.max(2, section.repeatCount ?? 2) : 1;
+
+    let sectionBarSpan = 0;
+    for (const b of section.bars) {
+      sectionBarSpan += b.repeat && b.repeat > 1 ? b.repeat : 1;
+    }
+
+    for (let pass = 1; pass <= sectionPasses; pass++) {
+      let localBarOffset = 0;
+      for (let barIdx = 0; barIdx < section.bars.length; barIdx++) {
+        const bar = section.bars[barIdx];
+        const isLastBarOfSection = barIdx === section.bars.length - 1;
+        const repeats = bar.repeat && bar.repeat > 1 ? bar.repeat : 1;
+        for (let r = 1; r <= repeats; r++) {
+          localBarOffset += 1;
+          const barNumForStep = sectionStartBarNum + localBarOffset - 1;
+          if (loopSectionId && section.id !== loopSectionId) {
+            continue;
+          }
+          const effectiveMeter = (bar.meter || song.timeSignature) as BarMeter;
+          const effectiveBpm = bar.tempo || song.bpm;
+          timeline.push({
+            globalBarIndex: timeline.length,
+            displayBarNumber: barNumForStep,
+            sectionId: section.id,
+            sectionName: section.name,
+            barId: bar.id,
+            bar,
+            repeatIteration: r,
+            repeatTotal: repeats,
+            effectiveBpm,
+            effectiveMeter,
+            beatsPerBar: parseMeterBeats(effectiveMeter),
+            sectionTranspose: secTranspose,
+            sectionPass: pass,
+            sectionTotalPasses: sectionPasses,
+            isLastBarOfSection,
+            lastBarCuePassRule: section.lastBarCuePassRule ?? 'all',
+          });
         }
-        const effectiveMeter = (bar.meter || song.timeSignature) as BarMeter;
-        const effectiveBpm = bar.tempo || song.bpm;
-        timeline.push({
-          globalBarIndex: timeline.length,
-          displayBarNumber: displayBarCounter,
-          sectionId: section.id,
-          sectionName: section.name,
-          barId: bar.id,
-          bar,
-          repeatIteration: r,
-          repeatTotal: repeats,
-          effectiveBpm,
-          effectiveMeter,
-          beatsPerBar: parseMeterBeats(effectiveMeter),
-          sectionTranspose: secTranspose,
-        });
       }
     }
+
+    displayBarCounter += sectionBarSpan;
   }
 
   return timeline;
@@ -151,6 +242,7 @@ export function buildSongTimeline(
 export function getGlobalDisplayBarNumber(song: Song, targetSectionId: string, targetBarId: string): number {
   let count = 0;
   for (const sec of song.sections) {
+    if (sec.isReference || sec.bars.length === 0) continue;
     for (const bar of sec.bars) {
       const repeats = bar.repeat && bar.repeat > 1 ? bar.repeat : 1;
       if (sec.id === targetSectionId && bar.id === targetBarId) {
