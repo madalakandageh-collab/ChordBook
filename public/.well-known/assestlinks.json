@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.chordbook_sooty.twa",
+        "sha256_cert_fingerprints": ["D5:68:68:12:C3:F1:DA:7F:DE:61:37:08:32:54:C9:93:A6:D2:40:49:06:DE:51:AE:3A:8E:DA:5A:26:E0:ED:E8"]
+      }
+    }]
