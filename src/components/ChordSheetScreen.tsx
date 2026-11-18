@@ -1,19 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
+  Check,
+  Copy,
   Edit3,
+  FileAudio,
   MoreVertical,
   Play,
   Plus,
-  Trash2,
   X,
 } from 'lucide-react';
 import type { Bar, LyricSection, Section, Song, TimeSignature } from '../types';
+import type { BarEditorMode } from './BarEditorModal';
 import {
-  formatChordDisplay,
+  formatBarChordsSummary,
   getSongTotalBars,
+  hasBeatSplits,
   parseMeterBeats,
-  transposeChord,
+  SONG_JSON_TEMPLATE,
   transposeKey,
 } from '../utils/chords';
 
@@ -25,8 +29,11 @@ interface ChordSheetScreenProps {
   activeBarId: string | null;
   activeSectionId: string | null;
   activeDisplayBarNumber: number | null;
+  barEditorMode: BarEditorMode;
+  onChangeBarEditorMode: (mode: BarEditorMode) => void;
   onBack: () => void;
   onSaveSong: () => void;
+  onOpenExportAudio: () => void;
   onTransposeChange: (delta: number) => void;
   onTimeSignatureChange: (ts: TimeSignature) => void;
   onOpenBarEditor: (sectionId: string, barId: string) => void;
@@ -47,8 +54,11 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
   isPlaying,
   activeBarId,
   activeSectionId,
+  barEditorMode,
+  onChangeBarEditorMode,
   onBack,
   onSaveSong,
+  onOpenExportAudio,
   onTransposeChange,
   onTimeSignatureChange,
   onOpenBarEditor,
@@ -63,6 +73,7 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
 }) => {
   const [tab, setTab] = useState<'chords' | 'lyrics'>('chords');
   const [showSongMenu, setShowSongMenu] = useState(false);
+  const [copiedToast, setCopiedToast] = useState(false);
   const [activeSectionMenuId, setActiveSectionMenuId] = useState<string | null>(null);
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);
   const [newSectionName, setNewSectionName] = useState('');
@@ -73,6 +84,21 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
   const [editKey, setEditKey] = useState(song.key);
   const [showLyricsEditor, setShowLyricsEditor] = useState(false);
   const [lyricsDraftText, setLyricsDraftText] = useState('');
+
+  const handleCopyJsonTemplate = async () => {
+    try {
+      await navigator.clipboard.writeText(SONG_JSON_TEMPLATE);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = SONG_JSON_TEMPLATE;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    setCopiedToast(true);
+    setTimeout(() => setCopiedToast(false), 2600);
+  };
 
   const activeBarRef = useRef<HTMLButtonElement | null>(null);
 
@@ -168,7 +194,30 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
           {showSongMenu && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setShowSongMenu(false)} />
-              <div className="absolute right-0 top-14 z-40 w-48 rounded-2xl bg-[#1C1B1A] border border-[#2D2B2A] shadow-2xl py-1.5 text-sm">
+              <div className="absolute right-0 top-14 z-40 w-60 rounded-2xl bg-[#1C1B1A] border border-[#2D2B2A] shadow-2xl py-1.5 text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSongMenu(false);
+                    onOpenExportAudio();
+                  }}
+                  className="w-full px-4 py-2.5 text-left hover:bg-[#242220] text-[#E5A958] font-medium flex items-center gap-2"
+                >
+                  <FileAudio className="w-4 h-4 shrink-0" />
+                  <span>Export Audio Track (WAV / MP3)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSongMenu(false);
+                    void handleCopyJsonTemplate();
+                  }}
+                  className="w-full px-4 py-2.5 text-left hover:bg-[#242220] text-[#F5F2EE] flex items-center gap-2"
+                >
+                  <Copy className="w-4 h-4 text-[#9C968F] shrink-0" />
+                  <span>Copy Song JSON Template</span>
+                </button>
+                <div className="my-1 border-t border-[#2D2B2A]" />
                 <button
                   type="button"
                   disabled={isLocked}
@@ -223,18 +272,55 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
         </div>
       </div>
 
-      {/* Metadata Badges */}
-      <div className="mt-4 flex flex-wrap items-center gap-2.5">
-        <span className="px-3.5 py-1.5 rounded-full bg-[#1C1B1A] border border-[#2D2B2A] text-[13px] font-medium text-[#F5F2EE] tabular-nums">
-          Key {displayKey}
-        </span>
-        <span className="px-3.5 py-1.5 rounded-full bg-[#1C1B1A] border border-[#2D2B2A] text-[13px] font-medium text-[#F5F2EE] tabular-nums">
-          {song.bpm} bpm
-        </span>
-        <span className="px-3.5 py-1.5 rounded-full bg-[#1C1B1A] border border-[#2D2B2A] text-[13px] font-medium text-[#F5F2EE] tabular-nums">
-          {song.timeSignature}
-        </span>
-        <span className="text-[13px] text-[#9C968F] pl-1 tabular-nums">{totalBars} bars</span>
+      {copiedToast && (
+        <div className="mt-3 px-4 py-2 rounded-xl bg-[#252019] border border-[#E5A958]/40 text-xs text-[#E5A958] flex items-center gap-2">
+          <Check className="w-3.5 h-3.5" />
+          <span>Song JSON Template copied to clipboard</span>
+        </div>
+      )}
+
+      {/* Metadata Badges + Compact Bar Editor Mode Toggle */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="px-3.5 py-1.5 rounded-full bg-[#1C1B1A] border border-[#2D2B2A] text-[13px] font-medium text-[#F5F2EE] tabular-nums">
+            Key {displayKey}
+          </span>
+          <span className="px-3.5 py-1.5 rounded-full bg-[#1C1B1A] border border-[#2D2B2A] text-[13px] font-medium text-[#F5F2EE] tabular-nums">
+            {song.bpm} bpm
+          </span>
+          <span className="px-3.5 py-1.5 rounded-full bg-[#1C1B1A] border border-[#2D2B2A] text-[13px] font-medium text-[#F5F2EE] tabular-nums">
+            {song.timeSignature}
+          </span>
+          <span className="text-[13px] text-[#9C968F] pl-1 tabular-nums">{totalBars} bars</span>
+        </div>
+
+        {/* Compact Split Bar Editor Toggle Switch (OFF = Chords Mode, ON = Cues & Settings Mode) */}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={barEditorMode === 'cues'}
+          onClick={() =>
+            onChangeBarEditorMode(barEditorMode === 'cues' ? 'chords' : 'cues')
+          }
+          className={`inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full border text-xs font-medium transition ${
+            barEditorMode === 'cues'
+              ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
+              : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#F5F2EE] hover:bg-[#242220]'
+          }`}
+        >
+          <span>Cues &amp; Settings</span>
+          <span
+            className={`w-9 h-5 rounded-full p-0.5 transition flex items-center ${
+              barEditorMode === 'cues' ? 'bg-[#E5A958]' : 'bg-[#2D2B2A]'
+            }`}
+          >
+            <span
+              className={`w-4 h-4 rounded-full bg-[#F5F2EE] transition-transform ${
+                barEditorMode === 'cues' ? 'translate-x-4' : 'translate-x-0'
+              }`}
+            />
+          </span>
+        </button>
       </div>
 
       {/* Transpose & Time Signature Card */}
@@ -447,8 +533,8 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                     runningBarNum += repeats;
 
                     const isBarActive = isPlaying && activeBarId === bar.id;
-                    const transposed = transposeChord(bar.chord, secTranspose, displayKey);
-                    const displayChord = formatChordDisplay(transposed);
+                    const isSplit = hasBeatSplits(bar);
+                    const displayChord = formatBarChordsSummary(bar, secTranspose, displayKey);
 
                     return (
                       <button
@@ -474,16 +560,24 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                         )}
 
                         <span
-                          className={`font-serif-display text-[18px] sm:text-[20px] font-semibold mt-1 ${
+                          className={`font-serif-display ${
+                            isSplit ? 'text-[14px] sm:text-[16px]' : 'text-[18px] sm:text-[20px]'
+                          } font-semibold mt-1 leading-tight max-w-full truncate ${
                             isBarActive ? 'text-[#E5A958]' : 'text-[#F5F2EE]'
                           }`}
                         >
                           {displayChord}
                         </span>
 
-                        {bar.cue && (
-                          <span className="text-[10px] text-[#9C968F] mt-1 truncate max-w-full">
-                            cue
+                        {bar.lyrics && (
+                          <span className="text-[10px] font-sinhala text-[#9C968F] mt-1 truncate max-w-full">
+                            {bar.lyrics}
+                          </span>
+                        )}
+
+                        {(bar.cue || bar.voiceCountLocked) && (
+                          <span className="text-[10px] text-[#E5A958]/80 mt-0.5 truncate max-w-full">
+                            {bar.cue ? bar.cue : 'count'}
                           </span>
                         )}
 

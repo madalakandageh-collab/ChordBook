@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowLeft, Lock, LockOpen, Repeat, Target } from 'lucide-react';
 import type { Song, TimelineBar } from '../types';
-import { formatChordDisplay, transposeChord, transposeKey } from '../utils/chords';
+import { formatBarChordsSummary, transposeKey } from '../utils/chords';
 
 interface PracticeSelectScreenProps {
   songs: Song[];
@@ -112,11 +112,10 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
   const totalBars = timeline.length;
   const effectiveBpm = Math.round((currentStep?.effectiveBpm || song.bpm) * (speed / 100));
 
-  const currentChordRaw = currentStep?.bar.chord || '-';
   const currentTotalTranspose = (song.transpose || 0) + (currentStep?.sectionTranspose || 0);
-  const currentChordDisplay = formatChordDisplay(
-    transposeChord(currentChordRaw, currentTotalTranspose, displayKey)
-  );
+  const currentChordDisplay = currentStep
+    ? formatBarChordsSummary(currentStep.bar, currentTotalTranspose, displayKey)
+    : '—';
 
   // Upcoming 4 bars strip (starting at current bar)
   const upcomingBars = [0, 1, 2, 3].map((offset) => {
@@ -126,7 +125,7 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
     const tr = (song.transpose || 0) + step.sectionTranspose;
     return {
       idx,
-      chord: formatChordDisplay(transposeChord(step.bar.chord, tr, displayKey)),
+      chord: formatBarChordsSummary(step.bar, tr, displayKey),
       isCurrent: offset === 0,
     };
   });
@@ -212,9 +211,14 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
 
         {/* Main Active Chord Display */}
         <div className="rounded-3xl bg-[#161514] border border-[#2D2B2A] py-12 px-6 flex flex-col items-center justify-center text-center min-h-[205px]">
-          <div className="font-serif-display text-[56px] leading-none font-bold text-[#F5F2EE]">
+          <div className="font-serif-display text-[48px] sm:text-[56px] leading-none font-bold text-[#F5F2EE]">
             {currentChordDisplay}
           </div>
+          {currentStep?.bar.lyrics && (
+            <div className="mt-2 font-sinhala text-sm text-[#F5F2EE]/85">
+              {currentStep.bar.lyrics}
+            </div>
+          )}
           {currentStep?.bar.cue && (
             <div className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-[#E5A958]">
               Cue: {currentStep.bar.cue}

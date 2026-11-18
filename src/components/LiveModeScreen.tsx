@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowLeft, Radio, Users, Wifi } from 'lucide-react';
 import type { RoomPresence, Song, TimelineBar } from '../types';
-import { formatChordDisplay, transposeChord, transposeKey } from '../utils/chords';
+import { formatBarChordsSummary, transposeKey } from '../utils/chords';
 import { useWakeLock } from '../hooks/useWakeLock';
 
 interface LiveModeScreenProps {
@@ -46,9 +46,9 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
   const currentStep = timeline[safeIdx];
   const displayKey = transposeKey(activeSong.key, activeSong.transpose || 0);
   const totalTranspose = (activeSong.transpose || 0) + (currentStep?.sectionTranspose || 0);
-  const currentChord = formatChordDisplay(
-    transposeChord(currentStep?.bar.chord || '-', totalTranspose, displayKey)
-  );
+  const currentChord = currentStep
+    ? formatBarChordsSummary(currentStep.bar, totalTranspose, displayKey)
+    : '—';
 
   const nextBars = [0, 1, 2, 3].map((offset) => {
     const idx = safeIdx + offset;
@@ -58,7 +58,7 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
     return {
       idx,
       barNum: step.displayBarNumber,
-      chord: formatChordDisplay(transposeChord(step.bar.chord, tr, displayKey)),
+      chord: formatBarChordsSummary(step.bar, tr, displayKey),
       cue: step.bar.cue,
       isCurrent: offset === 0,
     };
@@ -162,9 +162,14 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
 
       {/* Big Stage Active Chord Display */}
       <div className="rounded-3xl bg-[#161514] border border-[#2D2B2A] py-12 px-6 flex flex-col items-center justify-center text-center">
-        <div className="font-serif-display text-[68px] leading-none font-bold text-[#F5F2EE]">
+        <div className="font-serif-display text-[56px] sm:text-[68px] leading-none font-bold text-[#F5F2EE]">
           {currentChord}
         </div>
+        {currentStep?.bar.lyrics && (
+          <div className="mt-2 font-sinhala text-base text-[#F5F2EE]/90">
+            {currentStep.bar.lyrics}
+          </div>
+        )}
         {currentStep?.bar.cue && (
           <div className="mt-3 px-3 py-1 rounded-full bg-[#252019] border border-[#E5A958]/40 text-xs font-semibold text-[#E5A958] uppercase tracking-wider">
             {currentStep.bar.cue}

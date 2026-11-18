@@ -5,8 +5,8 @@ import type { SyncConnectionStatus } from '../hooks/useRoomSync';
 import { useWakeLock } from '../hooks/useWakeLock';
 import {
   buildSongTimeline,
-  formatChordDisplay,
-  transposeChord,
+  formatBarChordsSummary,
+  hasBeatSplits,
   transposeKey,
 } from '../utils/chords';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -225,9 +225,8 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
                       runningBarNum += repeats;
 
                       const isActive = isPlaying && activeBarId === bar.id;
-                      const chordText = formatChordDisplay(
-                        transposeChord(bar.chord, secTranspose, displayKey)
-                      );
+                      const isSplit = hasBeatSplits(bar);
+                      const chordText = formatBarChordsSummary(bar, secTranspose, displayKey);
 
                       return (
                         <div
@@ -248,14 +247,21 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
                             </span>
                           )}
                           <span
-                            className={`font-serif-display text-[22px] sm:text-[26px] font-bold ${
+                            className={`font-serif-display ${
+                              isSplit ? 'text-[16px] sm:text-[18px]' : 'text-[22px] sm:text-[26px]'
+                            } font-bold max-w-full truncate ${
                               isActive ? 'text-[#E5A958]' : 'text-[#F5F2EE]'
                             }`}
                           >
                             {chordText}
                           </span>
+                          {bar.lyrics && (
+                            <span className="text-[10px] font-sinhala text-[#9C968F] mt-1 truncate max-w-full">
+                              {bar.lyrics}
+                            </span>
+                          )}
                           {bar.cue && (
-                            <span className="text-[10px] text-[#E5A958]/90 mt-1 truncate max-w-full">
+                            <span className="text-[10px] text-[#E5A958]/90 mt-0.5 truncate max-w-full">
                               {bar.cue}
                             </span>
                           )}

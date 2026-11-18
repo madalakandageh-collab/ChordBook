@@ -218,4 +218,67 @@ export function createEmptyBar(chord = '-'): Bar {
   };
 }
 
+export function hasBeatSplits(bar: Bar): boolean {
+  return Array.isArray(bar.beatChords) && bar.beatChords.some((c) => c && c.trim() !== '' && c.trim() !== '-');
+}
+
+export function formatBarChordsSummary(bar: Bar, semitones = 0, targetKey?: string): string {
+  if (hasBeatSplits(bar) && bar.beatChords) {
+    const tokens = bar.beatChords
+      .map((c) => {
+        const clean = (c || '').trim();
+        if (!clean || clean === '-') return null;
+        return formatChordDisplay(transposeChord(clean, semitones, targetKey));
+      })
+      .filter((t): t is string => Boolean(t));
+    if (tokens.length > 0) {
+      return tokens.join(' · ');
+    }
+  }
+  return formatChordDisplay(transposeChord(bar.chord, semitones, targetKey));
+}
+
+export const SONG_JSON_TEMPLATE = JSON.stringify(
+  {
+    id: 'song-custom-template',
+    title: 'My New Song',
+    artist: 'Artist Name',
+    key: 'G',
+    bpm: 92,
+    timeSignature: '4/4',
+    transpose: 0,
+    sections: [
+      {
+        id: 'sec-intro',
+        name: 'Intro',
+        bars: [
+          { id: 'bar-1', chord: 'G', cue: 'Intro', voiceCountLocked: true, countingSystem: '1 2 3 4' },
+          { id: 'bar-2', chord: 'D' },
+          { id: 'bar-3', chord: 'Em', beatChords: ['Em', '', 'C', ''] },
+          { id: 'bar-4', chord: 'D', cue: 'Verse' },
+        ],
+      },
+      {
+        id: 'sec-verse',
+        name: 'Verse 1',
+        bars: [
+          { id: 'bar-5', chord: 'G', lyrics: 'First line of lyrics' },
+          { id: 'bar-6', chord: 'C' },
+          { id: 'bar-7', chord: 'Am', repeat: 2 },
+          { id: 'bar-8', chord: 'D', cue: 'Chorus' },
+        ],
+      },
+    ],
+    lyrics: [
+      {
+        id: 'lyr-verse-1',
+        label: 'Verse 1',
+        lines: ['First line of lyrics', 'Second line of lyrics'],
+      },
+    ],
+  },
+  null,
+  2
+);
+
 export { SHARP_SCALE, FLAT_SCALE };

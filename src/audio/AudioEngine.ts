@@ -1,5 +1,5 @@
-import type { BalanceSide, BeatUnit, CustomVoiceCue, MetronomeSettings, TimelineBar } from '../types';
-import { chordToMidiNotes } from '../utils/chords';
+import type { CustomVoiceCue, MetronomeSettings, TimelineBar } from '../types';
+import { hasBeatSplits } from '../utils/chords';
 import {
   BUNDLED_COUNT_CUES,
   BUNDLED_VOICE_CUES,
@@ -7,21 +7,17 @@ import {
   resolveBundledCueUrl,
   resolveCountCueUrl,
 } from '../utils/voiceCues';
+import {
+  balanceToPan,
+  scheduleChordSynth,
+  scheduleCubaseClick,
+  scheduleSubdivisionClicks,
+} from './cubaseClick';
 
 export interface PlaybackCallbacks {
   onBarChange: (timelineIndex: number, displayBarNumber: number, sectionId: string, beat: number, isCountIn: boolean) => void;
   onBeat: (beat: number, totalBeats: number, isCountIn: boolean) => void;
   onStop: () => void;
-}
-
-function balanceToPan(side: BalanceSide): number {
-  if (side === 'Left') return -0.85;
-  if (side === 'Right') return 0.85;
-  return 0;
-}
-
-function midiToFreq(midi: number): number {
-  return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
 export class ChordbookAudioEngine {
@@ -259,6 +255,10 @@ export class ChordbookAudioEngine {
 
   public stop(notify = true): void {
     this.isRunning = false;
+    this.currentStepIndex = 0;
+    this.currentBeatInBar = 0;
+    this.inCountIn = false;
+    this.countInBeat = 0;
     if (this.timerId !== null) {
       clearInterval(this.timerId);
       this.timerId = null;
@@ -305,68 +305,28 @@ export class ChordbookAudioEngine {
 
   private playClick(time: number, isDownbeat: boolean, isSubdivision: boolean): void {
     if (!this.ctx || this.settings.clickVolume <= 0) return;
-    const vol = (this.settings.clickVolume / 100) * (isSubdivision ? 0.38 : isDownbeat ? 0.95 : 0.65);
-
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    const panner = this.ctx.createStereoPanner();
-
-    panner.pan.setValueAtTime(balanceToPan(this.settings.clickBalance), time);
-    osc.type = isDownbeat ? 'triangle' : 'sine';
-    const freq = isDownbeat ? 1280 : isSubdivision ? 680 : 880;
-    osc.frequency.setValueAtTime(freq, time);
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.55, time + 0.035);
-
-    gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.linearRampToValueAtTime(vol, time + 0.004);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.055);
-
-    osc.connect(gain);
-    gain.connect(panner);
-    panner.connect(this.ctx.destination);
-
-    osc.start(time);
-    osc.stop(time + 0.065);
+    scheduleCubaseClick(
+      this.ctx,
+      this.ctx.destination,
+      time,
+      isDownbeat,
+      isSubdivision,
+      this.settings.clickVolume,
+      this.settings.clickBalance
+    );
   }
 
   private playChord(time: number, chordStr: string, semitones: number, durationSec: number): void {
     if (!this.ctx || !this.settings.chordAudioEnabled || this.settings.chordVolume <= 0) return;
-    const notes = chordToMidiNotes(chordStr, semitones);
-    if (!notes.length) return;
-
-    const vol = (this.settings.chordVolume / 100) * 0.14;
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(1650, time);
-
-    const masterGain = this.ctx.createGain();
-    masterGain.gain.setValueAtTime(0.0001, time);
-    masterGain.gain.linearRampToValueAtTime(vol, time + 0.025);
-    masterGain.gain.exponentialRampToValueAtTime(vol * 0.45, time + Math.min(durationSec * 0.85, 1.5));
-    masterGain.gain.exponentialRampToValueAtTime(0.0001, time + Math.min(durationSec, 1.8));
-
-    filter.connect(masterGain);
-    masterGain.connect(this.ctx.destination);
-
-    for (const midi of notes) {
-      const osc = this.ctx.createOscillator();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(midiToFreq(midi), time);
-      osc.connect(filter);
-      osc.start(time);
-      osc.stop(time + Math.min(durationSec + 0.05, 1.9));
-    }
-  }
-
-  private scheduleSubdivisions(beatStartTime: number, beatDurationSec: number, unit: BeatUnit): void {
-    if (unit === 'Eighth') {
-      this.playClick(beatStartTime + beatDurationSec * 0.5, false, true);
-    } else if (unit === 'Dotted') {
-      this.playClick(beatStartTime + beatDurationSec * 0.75, false, true);
-    } else if (unit === 'Triplet') {
-      this.playClick(beatStartTime + beatDurationSec / 3, false, true);
-      this.playClick(beatStartTime + (beatDurationSec * 2) / 3, false, true);
-    }
+    scheduleChordSynth(
+      this.ctx,
+      this.ctx.destination,
+      time,
+      chordStr,
+      semitones,
+      durationSec,
+      this.settings.chordVolume
+    );
   }
 
   private scheduler(): void {
@@ -389,7 +349,15 @@ export class ChordbookAudioEngine {
         const scheduledTime = this.nextNoteTime;
 
         this.playClick(scheduledTime, beatNum === 1, false);
-        this.scheduleSubdivisions(scheduledTime, beatDurationSec, this.settings.subdivision);
+        scheduleSubdivisionClicks(
+          this.ctx,
+          this.ctx.destination,
+          scheduledTime,
+          beatDurationSec,
+          this.settings.subdivision,
+          this.settings.clickVolume,
+          this.settings.clickBalance
+        );
         // Play spoken MP3 count 1-7 for the count-in bar (e.g. 1-2-3-4 for 4/4, 1-2-3 for 3/4, 1-2-3-4-5-6 for 6/8)
         this.scheduleCountNumber(scheduledTime, beatNum);
 
@@ -424,15 +392,34 @@ export class ChordbookAudioEngine {
 
       this.playClick(scheduledTime, beatNum === 1, false);
       const activeUnit = currentStep.bar.beatUnit || this.settings.subdivision;
-      this.scheduleSubdivisions(scheduledTime, beatDurationSec, activeUnit);
+      scheduleSubdivisionClicks(
+        this.ctx,
+        this.ctx.destination,
+        scheduledTime,
+        beatDurationSec,
+        activeUnit,
+        this.settings.clickVolume,
+        this.settings.clickBalance
+      );
 
-      if (beatNum === 1) {
-        const totalTranspose = this.globalTranspose + currentStep.sectionTranspose;
-        this.playChord(scheduledTime, currentStep.bar.chord, totalTranspose, beatDurationSec * beatsInBar);
-
-        if (currentStep.bar.cue || currentStep.bar.customCueId) {
-          this.scheduleVoiceCue(scheduledTime, currentStep.bar.cue, currentStep.bar.customCueId);
+      const totalTranspose = this.globalTranspose + currentStep.sectionTranspose;
+      if (hasBeatSplits(currentStep.bar) && currentStep.bar.beatChords) {
+        const beatChord = (currentStep.bar.beatChords[beatIndex] || '').trim();
+        if (beatChord && beatChord !== '-') {
+          let holdBeats = 1;
+          for (let nb = beatNum; nb < beatsInBar; nb++) {
+            const nextVal = (currentStep.bar.beatChords[nb] || '').trim();
+            if (nextVal && nextVal !== '-') break;
+            holdBeats += 1;
+          }
+          this.playChord(scheduledTime, beatChord, totalTranspose, beatDurationSec * holdBeats);
         }
+      } else if (beatNum === 1) {
+        this.playChord(scheduledTime, currentStep.bar.chord, totalTranspose, beatDurationSec * beatsInBar);
+      }
+
+      if (beatNum === 1 && (currentStep.bar.cue || currentStep.bar.customCueId)) {
+        this.scheduleVoiceCue(scheduledTime, currentStep.bar.cue, currentStep.bar.customCueId);
       }
 
       // Play spoken MP3 counts 1-7 when Voice count is locked to this bar

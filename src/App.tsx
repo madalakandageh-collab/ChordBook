@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChordbookAudioEngine } from './audio/AudioEngine';
-import { BarEditorModal } from './components/BarEditorModal';
+import { BarEditorModal, type BarEditorMode } from './components/BarEditorModal';
 import { ChordSheetScreen } from './components/ChordSheetScreen';
+import { ExportAudioModal } from './components/ExportAudioModal';
 import { LiveModeScreen } from './components/LiveModeScreen';
 import { LocalWifiScreen } from './components/LocalWifiScreen';
 import { MetronomeModal } from './components/MetronomeModal';
@@ -9,7 +10,7 @@ import { NavDrawer } from './components/NavDrawer';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PersistentPlayBar } from './components/PersistentPlayBar';
 import { PracticePlayerScreen, PracticeSelectScreen } from './components/PracticeScreens';
-import { SheetsHomeScreen } from './components/SheetsHomeScreen';
+import { SheetsHomeScreen, type ImportedJsonPayload } from './components/SheetsHomeScreen';
 import { SimpleMemberView } from './components/SimpleMemberView';
 import { TopBar } from './components/TopBar';
 import { INITIAL_SETLISTS, INITIAL_SONGS } from './data/initialSongs';
@@ -20,7 +21,6 @@ import type {
   MetronomeSettings,
   RoomSyncState,
   ScreenName,
-  SerializedVoiceCue,
   Setlist,
   Song,
   TimeSignature,
@@ -105,7 +105,9 @@ export default function App() {
     sectionId: string;
     barId: string;
   } | null>(null);
+  const [barEditorMode, setBarEditorMode] = useState<BarEditorMode>('chords');
   const [showMetronomeModal, setShowMetronomeModal] = useState(false);
+  const [showExportAudioModal, setShowExportAudioModal] = useState(false);
   const [cueLibraryVersion, setCueLibraryVersion] = useState(0);
 
   // Member synced state (used when role === 'member' or Preview Member App)
@@ -244,6 +246,9 @@ export default function App() {
       onStop: () => {
         setIsPlaying(false);
         setIsCountIn(false);
+        setActiveStepIndex(0);
+        setCurrentBeat(1);
+        setPlayStartBarIndex(0);
         setPlayStartedAtServerTime(null);
       },
     });
@@ -273,6 +278,7 @@ export default function App() {
       if (!timeline.length) return;
       const safeStart = Math.max(0, Math.min(startIndex, timeline.length - 1));
       setActiveStepIndex(safeStart);
+      setCurrentBeat(1);
       setPlayStartBarIndex(safeStart);
       setPlayStartedAtServerTime(Date.now() + clockOffsetMs);
       setIsPlaying(true);
@@ -293,6 +299,9 @@ export default function App() {
     audioEngineRef.current?.stop(false);
     setIsPlaying(false);
     setIsCountIn(false);
+    setActiveStepIndex(0);
+    setCurrentBeat(1);
+    setPlayStartBarIndex(0);
     setPlayStartedAtServerTime(null);
   }, []);
 
@@ -300,9 +309,9 @@ export default function App() {
     if (isPlaying) {
       stopPlayback();
     } else {
-      startPlaybackFromIndex(activeStepIndex);
+      startPlaybackFromIndex(0);
     }
-  }, [isPlaying, stopPlayback, startPlaybackFromIndex, activeStepIndex]);
+  }, [isPlaying, stopPlayback, startPlaybackFromIndex]);
 
   // Song Update Helper
   const updateActiveSong = useCallback(
@@ -337,52 +346,131 @@ export default function App() {
     setHasUnsavedChanges(false);
   }, [songs]);
 
-  const handleExportJson = useCallback(async () => {
-    const customVoiceCues = await exportCustomVoiceCuesAsBase64();
-    const payload = JSON.stringify({ songs, setlists, customVoiceCues }, null, 2);
-    const blob = new Blob([payload], { type: 'application/json' });
+  const downloadJsonFile = (payload: unknown, filename: string) => {
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `chordbook-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = filename;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const handleExportLightweightJson = useCallback(() => {
+    downloadJsonFile(
+      { songs, setlists },
+      `chordbook-sheets-${new Date().toISOString().slice(0, 10)}.json`
+    );
   }, [songs, setlists]);
 
+  const handleExportFullBackupJson = useCallback(async () => {
+    const customVoiceCues = await exportCustomVoiceCuesAsBase64();
+    downloadJsonFile(
+      { songs, setlists, customVoiceCues },
+      `chordbook-full-backup-${new Date().toISOString().slice(0, 10)}.json`
+    );
+  }, [songs, setlists]);
+
+  const handleExportSetlistJson = useCallback(
+    (setlistId: string) => {
+      const target = setlists.find((sl) => sl.id === setlistId);
+      if (!target) return;
+      const setlistSongs = target.songIds
+        .map((id) => songs.find((s) => s.id === id))
+        .filter((s): s is Song => Boolean(s));
+      const slug =
+        target.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '') || 'setlist';
+      downloadJsonFile({ setlist: target, songs: setlistSongs }, `${slug}-setlist.json`);
+    },
+    [setlists, songs]
+  );
+
   const handleImportJson = useCallback(
-    async (data: {
-      songs?: Song[];
-      setlists?: Setlist[];
-      customVoiceCues?: SerializedVoiceCue[];
-    }) => {
+    async (data: ImportedJsonPayload) => {
+      const songIdMap = new Map<string, string>();
+
       if (data.songs && Array.isArray(data.songs)) {
-        setSongs((prev) => {
-          const existingIds = new Set(prev.map((s) => s.id));
-          const incoming = data.songs!.filter((s) => s && s.id && s.title);
-          const merged = [...prev];
-          for (const item of incoming) {
-            if (existingIds.has(item.id)) {
-              const idx = merged.findIndex((x) => x.id === item.id);
-              if (idx >= 0) merged[idx] = item;
-            } else {
-              merged.push(item);
-            }
+        const mergedSongs = [...songs];
+        for (const raw of data.songs) {
+          if (!raw || !raw.title) continue;
+          const incomingId =
+            raw.id ||
+            `song-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+          const normalizedTitle = raw.title.trim().toLowerCase();
+
+          const matchIdx = mergedSongs.findIndex(
+            (x) => x.id === incomingId || x.title.trim().toLowerCase() === normalizedTitle
+          );
+
+          const normalizedSong: Song = {
+            id: matchIdx >= 0 ? mergedSongs[matchIdx].id : incomingId,
+            title: raw.title.trim(),
+            artist: raw.artist || 'Unknown Artist',
+            key: raw.key || 'C',
+            bpm: Number(raw.bpm) || 92,
+            timeSignature: raw.timeSignature || '4/4',
+            transpose: Number(raw.transpose) || 0,
+            sections: Array.isArray(raw.sections) ? raw.sections : [],
+            lyrics: Array.isArray(raw.lyrics) ? raw.lyrics : [],
+            updatedAt: Date.now(),
+          };
+
+          songIdMap.set(incomingId, normalizedSong.id);
+          if (matchIdx >= 0) {
+            mergedSongs[matchIdx] = normalizedSong;
+          } else {
+            mergedSongs.push(normalizedSong);
           }
-          return merged;
-        });
+        }
+        setSongs(mergedSongs);
       }
+
+      const incomingSetlists: Setlist[] = [];
       if (data.setlists && Array.isArray(data.setlists)) {
+        incomingSetlists.push(...data.setlists);
+      }
+      if (data.setlist && typeof data.setlist === 'object') {
+        incomingSetlists.push(data.setlist);
+      }
+
+      if (incomingSetlists.length > 0) {
         setSetlists((prev) => {
-          const existingIds = new Set(prev.map((sl) => sl.id));
           const merged = [...prev];
-          for (const sl of data.setlists!) {
-            if (sl && sl.id && !existingIds.has(sl.id)) {
-              merged.push(sl);
+          for (const sl of incomingSetlists) {
+            if (!sl || !sl.name) continue;
+            const incomingSlId = sl.id || `setlist-${Date.now().toString(36)}`;
+            const normalizedName = sl.name.trim().toLowerCase();
+            const remappedSongIds = Array.from(
+              new Set((sl.songIds || []).map((id) => songIdMap.get(id) || id))
+            );
+
+            const matchIdx = merged.findIndex(
+              (x) => x.id === incomingSlId || x.name.trim().toLowerCase() === normalizedName
+            );
+
+            if (matchIdx >= 0) {
+              const existing = merged[matchIdx];
+              const combinedIds = Array.from(new Set([...existing.songIds, ...remappedSongIds]));
+              merged[matchIdx] = { ...existing, songIds: combinedIds };
+            } else {
+              merged.push({
+                id: incomingSlId,
+                name: sl.name.trim(),
+                songIds: remappedSongIds,
+                createdAt: sl.createdAt || Date.now(),
+              });
             }
           }
           return merged;
         });
       }
+
       if (data.customVoiceCues && Array.isArray(data.customVoiceCues)) {
         await importCustomVoiceCuesFromBase64(data.customVoiceCues);
         for (const cue of data.customVoiceCues) {
@@ -391,7 +479,7 @@ export default function App() {
         setCueLibraryVersion((v) => v + 1);
       }
     },
-    []
+    [songs]
   );
 
   // Dedicated Member Mode or Preview Member App
@@ -509,7 +597,9 @@ export default function App() {
             handleSelectSong(songId, 'song-detail');
           }}
           onImportJson={handleImportJson}
-          onExportJson={handleExportJson}
+          onExportLightweightJson={handleExportLightweightJson}
+          onExportFullBackupJson={handleExportFullBackupJson}
+          onExportSetlistJson={handleExportSetlistJson}
         />
       )}
 
@@ -522,8 +612,11 @@ export default function App() {
           activeBarId={currentStep?.barId || null}
           activeSectionId={currentStep?.sectionId || null}
           activeDisplayBarNumber={currentStep?.displayBarNumber || null}
+          barEditorMode={barEditorMode}
+          onChangeBarEditorMode={setBarEditorMode}
           onBack={() => setScreen('sheets')}
           onSaveSong={handleSaveSong}
+          onOpenExportAudio={() => setShowExportAudioModal(true)}
           onTransposeChange={(delta) =>
             updateActiveSong((s) => ({
               ...s,
@@ -755,6 +848,7 @@ export default function App() {
           sectionName={editingSection.name}
           songBpm={activeSong.bpm}
           songTimeSignature={activeSong.timeSignature}
+          mode={barEditorMode}
           libraryVersion={cueLibraryVersion}
           onUpdateBar={(updatedBar: Bar) => {
             updateActiveSong((s) => ({
@@ -821,6 +915,15 @@ export default function App() {
             setCueLibraryVersion((v) => v + 1);
           }}
           onClose={() => setShowMetronomeModal(false)}
+        />
+      )}
+
+      {/* Offline Audio Track Exporter (WAV / MP3 for Cubase & Sharing) */}
+      {showExportAudioModal && activeSong && (
+        <ExportAudioModal
+          song={activeSong}
+          settings={settings}
+          onClose={() => setShowExportAudioModal(false)}
         />
       )}
     </div>

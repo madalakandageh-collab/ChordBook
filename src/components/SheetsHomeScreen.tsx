@@ -1,9 +1,12 @@
 import React, { useRef, useState } from 'react';
 import {
+  Check,
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  Copy,
   Download,
+  FileAudio,
   FileJson,
   ListMusic,
   Play,
@@ -13,7 +16,19 @@ import {
   X,
 } from 'lucide-react';
 import type { SerializedVoiceCue, Setlist, Song } from '../types';
-import { createEmptyBar, getSongTotalBars, transposeKey } from '../utils/chords';
+import {
+  SONG_JSON_TEMPLATE,
+  createEmptyBar,
+  getSongTotalBars,
+  transposeKey,
+} from '../utils/chords';
+
+export interface ImportedJsonPayload {
+  songs?: Song[];
+  setlists?: Setlist[];
+  setlist?: Setlist;
+  customVoiceCues?: SerializedVoiceCue[];
+}
 
 interface SheetsHomeScreenProps {
   songs: Song[];
@@ -26,12 +41,10 @@ interface SheetsHomeScreenProps {
   onAddSongToSetlist: (setlistId: string, songId: string) => void;
   onRemoveSongFromSetlist: (setlistId: string, songId: string) => void;
   onPlaySongFromSetlist: (songId: string) => void;
-  onImportJson: (data: {
-    songs?: Song[];
-    setlists?: Setlist[];
-    customVoiceCues?: SerializedVoiceCue[];
-  }) => void | Promise<void>;
-  onExportJson: () => void | Promise<void>;
+  onImportJson: (data: ImportedJsonPayload) => void | Promise<void>;
+  onExportLightweightJson: () => void;
+  onExportFullBackupJson: () => void | Promise<void>;
+  onExportSetlistJson: (setlistId: string) => void;
 }
 
 export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
@@ -46,13 +59,17 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
   onRemoveSongFromSetlist,
   onPlaySongFromSetlist,
   onImportJson,
-  onExportJson,
+  onExportLightweightJson,
+  onExportFullBackupJson,
+  onExportSetlistJson,
 }) => {
   const [activeTab, setActiveTab] = useState<'songs' | 'setlists'>('songs');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedSetlists, setExpandedSetlists] = useState<Record<string, boolean>>({});
   const [showNewSongModal, setShowNewSongModal] = useState(false);
   const [showNewSetlistModal, setShowNewSetlistModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [copiedTemplate, setCopiedTemplate] = useState(false);
   const [addSongTargetSetlistId, setAddSongTargetSetlistId] = useState<string | null>(null);
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
 
@@ -84,35 +101,53 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
     return sl.name.toLowerCase().includes(normalizedQuery);
   });
 
+  const handleCopySongTemplate = async () => {
+    try {
+      await navigator.clipboard.writeText(SONG_JSON_TEMPLATE);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = SONG_JSON_TEMPLATE;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    setCopiedTemplate(true);
+    setTimeout(() => setCopiedTemplate(false), 2400);
+  };
+
   const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const parsed = JSON.parse(String(reader.result));
         if (Array.isArray(parsed)) {
-          onImportJson({ songs: parsed as Song[] });
-          setImportFeedback(`Imported ${parsed.length} songs`);
+          await onImportJson({ songs: parsed as Song[] });
+          setImportFeedback(`Merged ${parsed.length} ${parsed.length === 1 ? 'song' : 'songs'}`);
         } else if (parsed && typeof parsed === 'object') {
-          const obj = parsed as {
-            songs?: Song[];
-            setlists?: Setlist[];
-            customVoiceCues?: SerializedVoiceCue[];
-          };
-          void onImportJson(obj);
-          const parts: string[] = [];
-          if (obj.songs?.length) parts.push(`${obj.songs.length} songs`);
-          if (obj.setlists?.length) parts.push(`${obj.setlists.length} setlists`);
-          if (obj.customVoiceCues?.length) parts.push(`${obj.customVoiceCues.length} voice cues`);
-          setImportFeedback(
-            parts.length ? `Imported ${parts.join(', ')}` : 'Backup imported'
-          );
+          const obj = parsed as ImportedJsonPayload & Partial<Song>;
+          // Check if single Song JSON object (has title & sections, no songs/setlists wrapper)
+          if (!obj.songs && !obj.setlists && !obj.setlist && obj.title && Array.isArray(obj.sections)) {
+            await onImportJson({ songs: [obj as Song] });
+            setImportFeedback(`Merged song "${obj.title}"`);
+          } else {
+            await onImportJson(obj);
+            const parts: string[] = [];
+            if (obj.songs?.length) parts.push(`${obj.songs.length} songs`);
+            if (obj.setlist) parts.push(`setlist "${obj.setlist.name}"`);
+            if (obj.setlists?.length) parts.push(`${obj.setlists.length} setlists`);
+            if (obj.customVoiceCues?.length) parts.push(`${obj.customVoiceCues.length} voice cues`);
+            setImportFeedback(
+              parts.length ? `Merged ${parts.join(', ')}` : 'JSON imported'
+            );
+          }
         }
       } catch {
         setImportFeedback('Invalid JSON file');
       }
-      setTimeout(() => setImportFeedback(null), 3000);
+      setTimeout(() => setImportFeedback(null), 3200);
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -180,7 +215,7 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 pt-1 shrink-0">
+        <div className="flex items-center gap-2 pt-1 shrink-0 relative">
           <input
             ref={fileInputRef}
             type="file"
@@ -199,13 +234,61 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
 
           <button
             type="button"
-            onClick={onExportJson}
-            aria-label="Export all songs and setlists as JSON"
+            onClick={() => setShowExportMenu((v) => !v)}
+            aria-label="Export JSON options"
             title="Export JSON"
-            className="w-10 h-10 rounded-full bg-[#1C1B1A] hover:bg-[#242220] border border-[#2D2B2A] text-[#F5F2EE] flex items-center justify-center transition"
+            className={`w-10 h-10 rounded-full border flex items-center justify-center transition ${
+              showExportMenu
+                ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
+                : 'bg-[#1C1B1A] hover:bg-[#242220] border-[#2D2B2A] text-[#F5F2EE]'
+            }`}
           >
             <Download className="w-4 h-4" />
           </button>
+
+          {showExportMenu && (
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setShowExportMenu(false)} />
+              <div className="absolute right-0 top-12 z-40 w-72 rounded-2xl bg-[#1C1B1A] border border-[#2D2B2A] shadow-2xl p-1.5 text-sm space-y-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    onExportLightweightJson();
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-left hover:bg-[#242220] flex items-start gap-2.5 transition"
+                >
+                  <FileJson className="w-4 h-4 text-[#E5A958] mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-[#F5F2EE]">
+                      Export Songs &amp; Setlists JSON (Lightweight)
+                    </p>
+                    <p className="text-[11px] text-[#9C968F] mt-0.5">
+                      Small editable sheets &amp; setlists without audio blobs
+                    </p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    void onExportFullBackupJson();
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-left hover:bg-[#242220] flex items-start gap-2.5 transition"
+                >
+                  <FileAudio className="w-4 h-4 text-[#6E7BF2] mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-[#F5F2EE]">
+                      Export Full Backup JSON (With Custom Audio)
+                    </p>
+                    <p className="text-[11px] text-[#9C968F] mt-0.5">
+                      Includes recorded &amp; imported custom voice cues
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -320,11 +403,11 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                   }
                   className="w-full flex items-center justify-between gap-3.5 p-4 hover:bg-[#22201E] transition text-left"
                 >
-                  <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
                     <div className="w-11 h-11 rounded-full bg-[#242220] border border-[#2D2B2A] text-[#E5A958] flex items-center justify-center shrink-0">
                       <ListMusic className="w-5 h-5" />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <h2 className="font-serif-display text-[18px] font-bold text-[#F5F2EE] truncate">
                         {setlist.name}
                       </h2>
@@ -395,17 +478,31 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                       ))
                     )}
 
-                    {!isLocked && (
-                      <div className="flex items-center justify-between pt-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {!isLocked && (
+                          <button
+                            type="button"
+                            onClick={() => setAddSongTargetSetlistId(setlist.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#242220] hover:bg-[#2D2B2A] text-xs font-medium text-[#E5A958]"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add song</span>
+                          </button>
+                        )}
+
                         <button
                           type="button"
-                          onClick={() => setAddSongTargetSetlistId(setlist.id)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#242220] hover:bg-[#2D2B2A] text-xs font-medium text-[#E5A958]"
+                          onClick={() => onExportSetlistJson(setlist.id)}
+                          title={`Export ${setlist.name} JSON`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#242220] hover:bg-[#2D2B2A] border border-[#2D2B2A] text-xs font-medium text-[#F5F2EE] transition"
                         >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Add song</span>
+                          <Download className="w-3.5 h-3.5 text-[#E5A958]" />
+                          <span>Export Setlist</span>
                         </button>
+                      </div>
 
+                      {!isLocked && (
                         <button
                           type="button"
                           onClick={() => onDeleteSetlist(setlist.id)}
@@ -414,8 +511,8 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>Delete</span>
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -542,6 +639,24 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
               className="w-full h-12 rounded-full bg-[#E5A958] hover:bg-[#ecb66c] text-[#121212] font-semibold text-sm transition"
             >
               Create chord sheet
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleCopySongTemplate()}
+              className="w-full h-10 rounded-full bg-[#141312] hover:bg-[#242220] border border-[#2D2B2A] text-xs font-medium text-[#9C968F] hover:text-[#F5F2EE] flex items-center justify-center gap-1.5 transition"
+            >
+              {copiedTemplate ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-[#E5A958]" />
+                  <span className="text-[#E5A958]">Song JSON Template Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 text-[#E5A958]" />
+                  <span>Copy Song JSON Template</span>
+                </>
+              )}
             </button>
           </form>
         </div>

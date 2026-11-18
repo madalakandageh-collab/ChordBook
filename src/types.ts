@@ -15,9 +15,13 @@ export type ScreenName =
   | 'local-wifi'
   | 'member';
 
+export type ExportAudioMixMode = 'click-cues' | 'full-mix';
+
 export interface Bar {
   id: string;
   chord: string; // e.g. 'G', 'Em', 'D7', or '-' for rest/continue
+  beatChords?: string[]; // optional per-beat chord splits (length up to beatsPerBar)
+  lyrics?: string; // optional bar-level lyric snippet
   meter?: BarMeter; // undefined means follows the song/section
   tempo?: number; // undefined means follows the song/section
   beatUnit?: BeatUnit;
