@@ -20,14 +20,52 @@ export interface PlaybackCallbacks {
   onStop: () => void;
 }
 
+/**
+ * Generates an in-memory 1-second silent PCM WAV Blob URL (0 audio samples).
+ * Used on mobile (iOS Safari / Android Chrome) so the OS treats active playback
+ * as an active media session and keeps background AudioContext + lock-screen controls alive.
+ */
+function createSilentWavBlobUrl(): string {
+  const sampleRate = 8000;
+  const numSamples = sampleRate; // 1 second
+  const dataSize = numSamples * 2; // 16-bit mono
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  const writeStr = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  };
+
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // Mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+}
+
 export class ChordbookAudioEngine {
   private ctx: AudioContext | null = null;
   private timerId: number | null = null;
+  private worker: Worker | null = null;
+  private workerUrl: string | null = null;
   private isRunning = false;
   private timeline: TimelineBar[] = [];
   private currentStepIndex = 0;
   private currentBeatInBar = 0;
   private nextNoteTime = 0;
+  private pendingStopAtTime: number | null = null;
   private speedPercent: 50 | 75 | 100 = 100;
   private globalTranspose = 0;
   private tempoOverride: number | null = null;
@@ -38,6 +76,13 @@ export class ChordbookAudioEngine {
   private countInTotalBeats = 4;
   private loopEnabled = false;
   private scheduledTimers: number[] = [];
+  private lastUiBeatTime = 0;
+
+  // Background Keep-Alive (Android & iOS)
+  private keepAliveOsc: OscillatorNode | null = null;
+  private keepAliveGain: GainNode | null = null;
+  private silentAudioEl: HTMLAudioElement | null = null;
+  private silentAudioUrl: string | null = null;
 
   // Decoded AudioBuffer caches for bundled MP3 cues, 1-7 count MP3s, and user cues
   private bundledBufferCache = new Map<string, AudioBuffer>();
@@ -48,6 +93,41 @@ export class ChordbookAudioEngine {
   constructor(settings: MetronomeSettings, callbacks: PlaybackCallbacks) {
     this.settings = settings;
     this.callbacks = callbacks;
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+  }
+
+  private handleVisibilityChange = (): void => {
+    if (!this.isRunning) return;
+    void this.resumeContextIfNeeded();
+    // Pre-fill hardware lookahead buffer immediately on visibility transition
+    this.scheduler();
+  };
+
+  private handleContextStateChange = (): void => {
+    if (!this.isRunning || !this.ctx) return;
+    const state = this.ctx.state as string;
+    if (state === 'suspended' || state === 'interrupted') {
+      void this.ctx.resume().catch(() => {});
+    }
+  };
+
+  private async resumeContextIfNeeded(): Promise<void> {
+    if (this.ctx) {
+      const state = this.ctx.state as string;
+      if (state === 'suspended' || state === 'interrupted') {
+        try {
+          await this.ctx.resume();
+        } catch {
+          // Ignore resume errors outside gesture
+        }
+      }
+    }
+    if (this.isRunning && this.silentAudioEl && this.silentAudioEl.paused) {
+      void this.silentAudioEl.play().catch(() => {});
+    }
   }
 
   private ensureContext(): AudioContext {
@@ -56,11 +136,133 @@ export class ChordbookAudioEngine {
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.ctx = new AudioCtx();
+      this.ctx.addEventListener('statechange', this.handleContextStateChange);
     }
-    if (this.ctx.state === 'suspended') {
-      void this.ctx.resume();
+    const state = this.ctx.state as string;
+    if (state === 'suspended' || state === 'interrupted') {
+      void this.ctx.resume().catch(() => {});
     }
     return this.ctx;
+  }
+
+  private startBackgroundKeepAlive(ctx: AudioContext): void {
+    // 1. Inaudible Web Audio oscillator keeps hardware audio clock running smoothly
+    if (!this.keepAliveOsc) {
+      try {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(20, ctx.currentTime);
+        gain.gain.setValueAtTime(0.00001, ctx.currentTime);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        this.keepAliveOsc = osc;
+        this.keepAliveGain = gain;
+      } catch {
+        // Ignore if oscillator creation fails
+      }
+    }
+
+    // 2. Looping silent HTMLAudioElement keeps mobile OS media pipeline & MediaSession active
+    if (typeof Audio !== 'undefined') {
+      try {
+        if (!this.silentAudioEl) {
+          this.silentAudioUrl = createSilentWavBlobUrl();
+          const audio = new Audio(this.silentAudioUrl);
+          audio.loop = true;
+          audio.volume = 0.01;
+          audio.preload = 'auto';
+          audio.setAttribute('playsinline', '');
+          this.silentAudioEl = audio;
+        }
+        if (this.silentAudioEl.paused) {
+          void this.silentAudioEl.play().catch(() => {});
+        }
+      } catch {
+        // Ignore audio element errors
+      }
+    }
+  }
+
+  private stopBackgroundKeepAlive(): void {
+    if (this.keepAliveOsc) {
+      try {
+        this.keepAliveOsc.stop();
+        this.keepAliveOsc.disconnect();
+      } catch {
+        // Already stopped
+      }
+      this.keepAliveOsc = null;
+    }
+    if (this.keepAliveGain) {
+      try {
+        this.keepAliveGain.disconnect();
+      } catch {
+        // Ignore
+      }
+      this.keepAliveGain = null;
+    }
+    if (this.silentAudioEl) {
+      try {
+        this.silentAudioEl.pause();
+        this.silentAudioEl.currentTime = 0;
+      } catch {
+        // Ignore
+      }
+    }
+  }
+
+  private startSchedulerTicker(): void {
+    this.stopSchedulerTicker();
+
+    // Prefer an inline Web Worker ticker so mobile background timer throttling doesn't stall lookahead
+    if (typeof Worker !== 'undefined' && typeof Blob !== 'undefined') {
+      try {
+        const workerCode = `
+          let id = null;
+          self.onmessage = function(e) {
+            if (e.data === 'start') {
+              if (id !== null) clearInterval(id);
+              id = setInterval(function() { self.postMessage('tick'); }, 25);
+            } else if (e.data === 'stop') {
+              if (id !== null) { clearInterval(id); id = null; }
+            }
+          };
+        `;
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        this.workerUrl = URL.createObjectURL(blob);
+        const worker = new Worker(this.workerUrl);
+        worker.onmessage = () => this.scheduler();
+        worker.postMessage('start');
+        this.worker = worker;
+        return;
+      } catch {
+        // Fall back to window.setInterval
+      }
+    }
+
+    this.timerId = window.setInterval(() => this.scheduler(), 25);
+  }
+
+  private stopSchedulerTicker(): void {
+    if (this.worker) {
+      try {
+        this.worker.postMessage('stop');
+        this.worker.terminate();
+      } catch {
+        // Ignore
+      }
+      this.worker = null;
+    }
+    if (this.workerUrl) {
+      URL.revokeObjectURL(this.workerUrl);
+      this.workerUrl = null;
+    }
+    if (this.timerId !== null) {
+      clearInterval(this.timerId);
+      this.timerId = null;
+    }
   }
 
   private async loadBundledCueBuffer(url: string): Promise<AudioBuffer | null> {
@@ -229,6 +431,7 @@ export class ChordbookAudioEngine {
     this.timeline = options.timeline;
     this.currentStepIndex = Math.max(0, Math.min(options.startIndex, options.timeline.length - 1));
     this.currentBeatInBar = 0;
+    this.pendingStopAtTime = null;
     this.speedPercent = options.speedPercent;
     this.globalTranspose = options.globalTranspose;
     this.tempoOverride = options.tempoOverride;
@@ -246,11 +449,14 @@ export class ChordbookAudioEngine {
     this.countInTotalBeats = firstBar?.beatsPerBar || 4;
     this.inCountIn = Boolean(this.settings.countInBar && !options.skipCountIn);
     this.countInBeat = 0;
+    this.lastUiBeatTime = 0;
 
     this.isRunning = true;
     this.nextNoteTime = ctx.currentTime + 0.06;
 
-    this.timerId = window.setInterval(() => this.scheduler(), 25);
+    this.startBackgroundKeepAlive(ctx);
+    this.scheduler();
+    this.startSchedulerTicker();
   }
 
   public stop(notify = true): void {
@@ -259,10 +465,12 @@ export class ChordbookAudioEngine {
     this.currentBeatInBar = 0;
     this.inCountIn = false;
     this.countInBeat = 0;
-    if (this.timerId !== null) {
-      clearInterval(this.timerId);
-      this.timerId = null;
-    }
+    this.pendingStopAtTime = null;
+    this.lastUiBeatTime = 0;
+
+    this.stopSchedulerTicker();
+    this.stopBackgroundKeepAlive();
+
     for (const id of this.scheduledTimers) {
       clearTimeout(id);
     }
@@ -279,6 +487,21 @@ export class ChordbookAudioEngine {
     if (notify) {
       this.callbacks.onStop();
     }
+  }
+
+  public destroy(): void {
+    this.stop(false);
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+    if (this.ctx) {
+      this.ctx.removeEventListener('statechange', this.handleContextStateChange);
+    }
+    if (this.silentAudioUrl) {
+      URL.revokeObjectURL(this.silentAudioUrl);
+      this.silentAudioUrl = null;
+    }
+    this.silentAudioEl = null;
   }
 
   public async testVoice(cueUrl = '/cues/chorus.mp3'): Promise<void> {
@@ -332,7 +555,23 @@ export class ChordbookAudioEngine {
   private scheduler(): void {
     if (!this.isRunning || !this.ctx) return;
 
-    const scheduleAheadTime = 0.1;
+    // Wait cleanly for the final scheduled beat of a non-looping song to finish playing
+    if (this.pendingStopAtTime !== null) {
+      if (this.ctx.currentTime >= this.pendingStopAtTime) {
+        this.stop(true);
+      }
+      return;
+    }
+
+    // Resync gracefully if AudioContext was briefly halted by OS interruption (never burst)
+    if (this.nextNoteTime < this.ctx.currentTime - 1.0) {
+      this.nextNoteTime = this.ctx.currentTime + 0.04;
+    }
+
+    // Use a larger hardware lookahead when backgrounded/screen-locked so throttled wakeups never drop beats
+    const isHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+    const scheduleAheadTime = isHidden ? 1.5 : 0.15;
+
     while (this.nextNoteTime < this.ctx.currentTime + scheduleAheadTime) {
       const currentStep = this.timeline[this.currentStepIndex];
       if (!currentStep) {
@@ -347,6 +586,7 @@ export class ChordbookAudioEngine {
       if (this.inCountIn) {
         const beatNum = this.countInBeat + 1;
         const scheduledTime = this.nextNoteTime;
+        const stepIdxSnapshot = this.currentStepIndex;
 
         this.playClick(scheduledTime, beatNum === 1, false);
         scheduleSubdivisionClicks(
@@ -363,9 +603,10 @@ export class ChordbookAudioEngine {
 
         const delayMs = Math.max(0, (scheduledTime - this.ctx.currentTime) * 1000);
         const timer = window.setTimeout(() => {
-          if (!this.isRunning) return;
+          if (!this.isRunning || scheduledTime < this.lastUiBeatTime) return;
+          this.lastUiBeatTime = scheduledTime;
           this.callbacks.onBarChange(
-            this.currentStepIndex,
+            stepIdxSnapshot,
             currentStep.displayBarNumber,
             currentStep.sectionId,
             beatNum,
@@ -437,7 +678,8 @@ export class ChordbookAudioEngine {
 
       const delayMs = Math.max(0, (scheduledTime - this.ctx.currentTime) * 1000);
       const timer = window.setTimeout(() => {
-        if (!this.isRunning) return;
+        if (!this.isRunning || scheduledTime < this.lastUiBeatTime) return;
+        this.lastUiBeatTime = scheduledTime;
         this.callbacks.onBarChange(
           stepIdxSnapshot,
           currentStep.displayBarNumber,
@@ -459,6 +701,7 @@ export class ChordbookAudioEngine {
           if (this.loopEnabled) {
             this.currentStepIndex = 0;
           } else {
+            this.pendingStopAtTime = this.nextNoteTime;
             const endDelay = Math.max(0, (this.nextNoteTime - this.ctx.currentTime) * 1000);
             const stopTimer = window.setTimeout(() => {
               if (this.isRunning) this.stop(true);

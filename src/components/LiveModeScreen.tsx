@@ -72,7 +72,7 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
           type="button"
           onClick={onBack}
           aria-label="Back to Your sheets"
-          className="w-10 h-10 rounded-full bg-[#1C1B1A] hover:bg-[#242220] border border-[#2D2B2A] text-[#F5F2EE] flex items-center justify-center transition"
+          className="w-10 h-10 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center justify-center transition shadow-xs"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
@@ -80,24 +80,24 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
         <button
           type="button"
           onClick={onOpenLocalWifi}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#1C1B1A] hover:bg-[#242220] border border-[#2D2B2A] text-xs font-medium transition"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs font-medium transition shadow-xs"
         >
           <span
             className={`w-2 h-2 rounded-full ${
-              syncStatus === 'connected' ? 'bg-emerald-400' : 'bg-[#E5A958]'
+              syncStatus === 'connected' ? 'bg-emerald-500' : 'bg-[#E5A958]'
             }`}
           />
-          <Users className="w-3.5 h-3.5 text-[#E5A958]" />
-          <span className="text-[#F5F2EE] tabular-nums">
+          <Users className="w-3.5 h-3.5 text-[var(--accent-amber-text)]" />
+          <span className="text-[var(--text-primary)] tabular-nums">
             {presence.memberCount} {presence.memberCount === 1 ? 'member' : 'members'} synced
           </span>
-          <Wifi className="w-3.5 h-3.5 text-[#9C968F]" />
+          <Wifi className="w-3.5 h-3.5 text-[var(--text-muted)]" />
         </button>
       </div>
 
       {/* Stage Song Switcher */}
       <div>
-        <p className="text-[11px] font-medium tracking-[0.22em] text-[#9C968F] uppercase mb-2">
+        <p className="text-[11px] font-medium tracking-[0.22em] text-[var(--text-muted)] uppercase mb-2">
           LIVE STAGE · BROADCASTING TO ROOM {presence.roomId}
         </p>
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
@@ -111,7 +111,7 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
                 className={`px-3.5 py-2 rounded-full border text-xs font-medium whitespace-nowrap shrink-0 transition ${
                   active
                     ? 'bg-[#E5A958] border-[#E5A958] text-[#121212] font-semibold'
-                    : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#F5F2EE]/85 hover:bg-[#242220]'
+                    : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)]/85 hover:bg-[var(--bg-elevated)]'
                 }`}
               >
                 {s.title}
@@ -122,38 +122,38 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
       </div>
 
       {/* Active Song Banner + Key Transpose */}
-      <div className="rounded-3xl bg-[#181716] border border-[#2D2B2A] p-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-xs text-[#E5A958] font-medium">
+          <div className="flex items-center gap-2 text-xs text-[var(--accent-amber-text)] font-medium">
             <Radio className="w-3.5 h-3.5" />
             <span>{currentStep?.sectionName || 'Start'}</span>
           </div>
-          <h1 className="font-serif-display text-2xl font-bold text-[#F5F2EE] truncate mt-0.5">
+          <h1 className="font-serif-display text-2xl font-bold text-[var(--text-primary)] truncate mt-0.5">
             {activeSong.title}
           </h1>
-          <p className="text-xs text-[#9C968F] tabular-nums">
+          <p className="text-xs text-[var(--text-muted)] tabular-nums">
             {activeSong.artist} · Key {displayKey} · {activeSong.bpm} bpm · {activeSong.timeSignature}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-[11px] tracking-[0.18em] text-[#9C968F] uppercase">KEY</span>
+          <span className="text-[11px] tracking-[0.18em] text-[var(--text-muted)] uppercase">KEY</span>
           <button
             type="button"
             disabled={isLocked}
             onClick={() => onTranspose(-1)}
-            className="w-9 h-9 rounded-full bg-[#242220] hover:bg-[#2D2B2A] disabled:opacity-40 border border-[#2D2B2A] text-[#F5F2EE] flex items-center justify-center"
+            className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] disabled:opacity-40 border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center justify-center"
           >
             −
           </button>
-          <span className="w-8 text-center font-serif-display text-lg font-bold text-[#E5A958]">
+          <span className="w-8 text-center font-serif-display text-lg font-bold text-[var(--accent-amber-text)]">
             {displayKey}
           </span>
           <button
             type="button"
             disabled={isLocked}
             onClick={() => onTranspose(1)}
-            className="w-9 h-9 rounded-full bg-[#242220] hover:bg-[#2D2B2A] disabled:opacity-40 border border-[#2D2B2A] text-[#F5F2EE] flex items-center justify-center"
+            className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] disabled:opacity-40 border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center justify-center"
           >
             +
           </button>
@@ -161,21 +161,21 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
       </div>
 
       {/* Big Stage Active Chord Display */}
-      <div className="rounded-3xl bg-[#161514] border border-[#2D2B2A] py-12 px-6 flex flex-col items-center justify-center text-center">
-        <div className="font-serif-display text-[56px] sm:text-[68px] leading-none font-bold text-[#F5F2EE]">
+      <div className="rounded-3xl bg-[var(--bg-stage)] border border-[var(--border-subtle)] py-12 px-6 flex flex-col items-center justify-center text-center shadow-xs">
+        <div className="font-serif-display text-[56px] sm:text-[68px] leading-none font-bold text-[var(--text-primary)]">
           {currentChord}
         </div>
         {currentStep?.bar.lyrics && (
-          <div className="mt-2 font-sinhala text-base text-[#F5F2EE]/90">
+          <div className="mt-2 font-sinhala text-base text-[var(--text-primary)]/90">
             {currentStep.bar.lyrics}
           </div>
         )}
         {currentStep?.bar.cue && (
-          <div className="mt-3 px-3 py-1 rounded-full bg-[#252019] border border-[#E5A958]/40 text-xs font-semibold text-[#E5A958] uppercase tracking-wider">
+          <div className="mt-3 px-3 py-1 rounded-full bg-[var(--accent-amber-tint)] border border-[#E5A958]/50 text-xs font-semibold text-[var(--accent-amber-text)] uppercase tracking-wider">
             {currentStep.bar.cue}
           </div>
         )}
-        <p className="mt-4 text-sm text-[#9C968F] tabular-nums">
+        <p className="mt-4 text-sm text-[var(--text-muted)] tabular-nums">
           Bar {currentStep?.displayBarNumber || 1} of {timeline.length} · {currentStep?.effectiveBpm || activeSong.bpm} bpm · {currentStep?.effectiveMeter || activeSong.timeSignature}
         </p>
         {isPlaying && (
@@ -184,7 +184,7 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
               <span
                 key={i}
                 className={`w-2.5 h-2.5 rounded-full transition-transform ${
-                  currentBeat === i + 1 ? 'bg-[#E5A958] scale-125' : 'bg-[#2D2B2A]'
+                  currentBeat === i + 1 ? 'bg-[#E5A958] scale-125' : 'bg-[var(--border-subtle)]'
                 }`}
               />
             ))}
@@ -200,20 +200,20 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
             type="button"
             disabled={!item}
             onClick={() => item && onSeekToBarIndex(item.idx)}
-            className={`relative h-20 rounded-2xl border flex flex-col items-center justify-center transition ${
+            className={`relative h-20 rounded-2xl border flex flex-col items-center justify-center transition shadow-xs ${
               item?.isCurrent
-                ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                : 'bg-[#181716] border-[#2D2B2A] text-[#F5F2EE] hover:bg-[#1C1B1A]'
+                ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                : 'bg-[var(--bg-panel)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
             }`}
           >
             {item && (
               <>
-                <span className="absolute top-1.5 left-2 text-[10px] text-[#78736D] tabular-nums">
+                <span className="absolute top-1.5 left-2 text-[10px] text-[var(--text-subtle)] tabular-nums">
                   {item.barNum}
                 </span>
                 <span className="font-serif-display text-xl font-bold">{item.chord}</span>
                 {item.cue && (
-                  <span className="text-[10px] text-[#9C968F] truncate max-w-[90%]">
+                  <span className="text-[10px] text-[var(--text-muted)] truncate max-w-[90%]">
                     {item.cue}
                   </span>
                 )}
@@ -224,8 +224,8 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
       </div>
 
       {/* Section Jump Bar */}
-      <div className="rounded-3xl bg-[#181716] border border-[#2D2B2A] p-4">
-        <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase mb-2.5">
+      <div className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-4 shadow-xs">
+        <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase mb-2.5">
           JUMP TO SECTION
         </p>
         <div className="flex flex-wrap gap-2">
@@ -238,8 +238,8 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
                 onClick={() => onSeekToSection(sec.id)}
                 className={`px-3.5 py-2 rounded-full border text-xs font-medium transition ${
                   isCurrentSec
-                    ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                    : 'bg-[#141312] border-[#2D2B2A] text-[#F5F2EE]/85 hover:bg-[#242220]'
+                    ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                    : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-primary)]/85 hover:bg-[var(--bg-elevated)]'
                 }`}
               >
                 {sec.name}

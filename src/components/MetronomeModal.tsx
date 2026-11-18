@@ -39,25 +39,28 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
 }) => {
   const [testCueUrl, setTestCueUrl] = useState('/cues/chorus.mp3');
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-xs">
+    <div
+      style={{ backgroundColor: 'var(--bg-backdrop)' }}
+      className="fixed inset-0 z-50 flex items-end justify-center backdrop-blur-xs"
+    >
       <div className="fixed inset-0" onClick={onClose} aria-hidden="true" />
-      <div className="relative z-10 w-full max-w-xl max-h-[90vh] flex flex-col rounded-t-3xl bg-[#181716] border-t border-x border-[#2D2B2A] shadow-2xl">
+      <div className="relative z-10 w-full max-w-xl max-h-[90vh] flex flex-col rounded-t-3xl bg-[var(--bg-panel)] border-t border-x border-[var(--border-subtle)] shadow-2xl">
         <div className="pt-3 pb-1 flex justify-center shrink-0">
-          <div className="w-10 h-1 rounded-full bg-[#3A3734]" />
+          <div className="w-10 h-1 rounded-full bg-[var(--drag-handle)]" />
         </div>
 
         <div className="px-5 pb-4 flex items-start justify-between shrink-0">
           <div>
-            <h2 className="font-serif-display text-[28px] font-bold text-[#F5F2EE] leading-tight">
+            <h2 className="font-serif-display text-[28px] font-bold text-[var(--text-primary)] leading-tight">
               Metronome
             </h2>
-            <p className="text-[13px] text-[#9C968F] mt-0.5">Click, cues and feel</p>
+            <p className="text-[13px] text-[var(--text-muted)] mt-0.5">Click, cues and feel</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close Metronome mixer"
-            className="w-10 h-10 rounded-full bg-[#242220] hover:bg-[#2D2B2A] text-[#F5F2EE] flex items-center justify-center transition"
+            className="w-10 h-10 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-center transition"
           >
             <X className="w-4 h-4" />
           </button>
@@ -67,10 +70,10 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
           {/* CLICK VOLUME */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
+              <span className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
                 CLICK VOLUME
               </span>
-              <span className="text-xs font-medium text-[#F5F2EE] tabular-nums">
+              <span className="text-xs font-medium text-[var(--text-primary)] tabular-nums">
                 {settings.clickVolume}%
               </span>
             </div>
@@ -88,7 +91,7 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
 
           {/* CLICK BALANCE */}
           <div>
-            <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase mb-2.5">
+            <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase mb-2.5">
               CLICK BALANCE
             </p>
             <div className="grid grid-cols-3 gap-2">
@@ -101,8 +104,8 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
                     onClick={() => onUpdateSettings({ ...settings, clickBalance: side })}
                     className={`h-10 rounded-full border text-sm font-medium transition ${
                       active
-                        ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                        : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#F5F2EE] hover:bg-[#242220]'
+                        ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                        : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
                     }`}
                   >
                     {side}
@@ -115,10 +118,10 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
           {/* VOICE CUE VOLUME */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
+              <span className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
                 VOICE CUE VOLUME
               </span>
-              <span className="text-xs font-medium text-[#F5F2EE] tabular-nums">
+              <span className="text-xs font-medium text-[var(--text-primary)] tabular-nums">
                 {settings.voiceVolume}%
               </span>
             </div>
@@ -136,7 +139,7 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
 
           {/* VOICE BALANCE */}
           <div>
-            <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase mb-2.5">
+            <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase mb-2.5">
               VOICE BALANCE
             </p>
             <div className="grid grid-cols-3 gap-2">
@@ -149,8 +152,8 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
                     onClick={() => onUpdateSettings({ ...settings, voiceBalance: side })}
                     className={`h-10 rounded-full border text-sm font-medium transition ${
                       active
-                        ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                        : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#F5F2EE] hover:bg-[#242220]'
+                        ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                        : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
                     }`}
                   >
                     {side}
@@ -163,9 +166,9 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
               <button
                 type="button"
                 onClick={() => onTestVoice(testCueUrl)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1C1B1A] hover:bg-[#242220] border border-[#2D2B2A] text-sm font-medium text-[#F5F2EE] transition"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-sm font-medium text-[var(--text-primary)] transition"
               >
-                <Headphones className="w-4 h-4 text-[#E5A958]" />
+                <Headphones className="w-4 h-4 text-[var(--accent-amber-text)]" />
                 <span>Test voice</span>
               </button>
 
@@ -176,7 +179,7 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
                   onTestVoice(e.target.value);
                 }}
                 aria-label="Select cue to test"
-                className="h-9 px-3 rounded-full bg-[#141312] border border-[#2D2B2A] text-xs text-[#9C968F] focus:border-[#E5A958] focus:outline-none"
+                className="h-9 px-3 rounded-full bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-xs text-[var(--text-muted)] focus:border-[#E5A958] focus:outline-none"
               >
                 {BUNDLED_VOICE_CUES.map((c) => (
                   <option key={c.url} value={c.url}>
@@ -200,10 +203,10 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
           {/* CHORD VOLUME */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
+              <span className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
                 CHORD VOLUME
               </span>
-              <span className="text-xs font-medium text-[#F5F2EE] tabular-nums">
+              <span className="text-xs font-medium text-[var(--text-primary)] tabular-nums">
                 {settings.chordVolume}%
               </span>
             </div>
@@ -220,10 +223,10 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
           </div>
 
           {/* Count-in bar toggle */}
-          <div className="rounded-2xl bg-[#141312] border border-[#2D2B2A] p-4 flex items-center justify-between gap-4">
+          <div className="rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] p-4 flex items-center justify-between gap-4">
             <div>
-              <p className="text-[15px] font-medium text-[#F5F2EE]">Count-in bar</p>
-              <p className="text-xs text-[#9C968F] mt-0.5">
+              <p className="text-[15px] font-medium text-[var(--text-primary)]">Count-in bar</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
                 Clicks and counts 1–4 before the song
               </p>
             </div>
@@ -235,11 +238,11 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
                 onUpdateSettings({ ...settings, countInBar: !settings.countInBar })
               }
               className={`w-12 h-7 rounded-full p-1 transition shrink-0 ${
-                settings.countInBar ? 'bg-[#E5A958]' : 'bg-[#2D2B2A]'
+                settings.countInBar ? 'bg-[#E5A958]' : 'bg-[var(--border-subtle)]'
               }`}
             >
               <div
-                className={`w-5 h-5 rounded-full bg-[#F5F2EE] transition-transform ${
+                className={`w-5 h-5 rounded-full bg-[var(--switch-knob)] shadow-xs transition-transform ${
                   settings.countInBar ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
@@ -248,10 +251,10 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
 
           {/* SONG TEMPO */}
           <div>
-            <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
+            <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
               SONG TEMPO
             </p>
-            <p className="text-xs text-[#9C968F] mt-0.5 mb-3">
+            <p className="text-xs text-[var(--text-muted)] mt-0.5 mb-3">
               Any value from 10 to 300
             </p>
             <div className="flex items-center gap-4">
@@ -264,7 +267,7 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
                 onChange={(e) =>
                   onUpdateSongTempo(Math.max(10, Math.min(300, Number(e.target.value) || 92)))
                 }
-                className="w-20 h-12 rounded-2xl bg-[#141312] border border-[#2D2B2A] text-center font-serif-display text-xl font-bold text-[#F5F2EE] tabular-nums disabled:opacity-50 focus:border-[#E5A958] focus:outline-none shrink-0"
+                className="w-20 h-12 rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-center font-serif-display text-xl font-bold text-[var(--text-primary)] tabular-nums disabled:opacity-50 focus:border-[#E5A958] focus:outline-none shrink-0"
               />
               <input
                 type="range"
@@ -289,8 +292,8 @@ export const MetronomeModal: React.FC<MetronomeModalProps> = ({
                   onClick={() => onUpdateSettings({ ...settings, subdivision: sub.id })}
                   className={`h-11 rounded-full border text-xs sm:text-sm font-medium transition ${
                     active
-                      ? 'bg-[#252019] border-dashed border-[#E5A958] text-[#E5A958]'
-                      : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#F5F2EE] hover:bg-[#242220]'
+                      ? 'bg-[var(--accent-amber-tint)] border-dashed border-[#E5A958] text-[var(--accent-amber-text)]'
+                      : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
                   }`}
                 >
                   {sub.label}

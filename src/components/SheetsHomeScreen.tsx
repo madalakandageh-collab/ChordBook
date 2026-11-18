@@ -128,7 +128,6 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
           setImportFeedback(`Merged ${parsed.length} ${parsed.length === 1 ? 'song' : 'songs'}`);
         } else if (parsed && typeof parsed === 'object') {
           const obj = parsed as ImportedJsonPayload & Partial<Song>;
-          // Check if single Song JSON object (has title & sections, no songs/setlists wrapper)
           if (!obj.songs && !obj.setlists && !obj.setlist && obj.title && Array.isArray(obj.sections)) {
             await onImportJson({ songs: [obj as Song] });
             setImportFeedback(`Merged song "${obj.title}"`);
@@ -204,13 +203,13 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-[11px] font-medium tracking-[0.26em] text-[#9C968F] uppercase">
+          <p className="text-[11px] font-medium tracking-[0.26em] text-[var(--text-muted)] uppercase">
             CHORDBOOK
           </p>
-          <h1 className="font-serif-display text-[36px] leading-[1.08] font-bold text-[#F5F2EE] mt-1.5">
+          <h1 className="font-serif-display text-[36px] leading-[1.08] font-bold text-[var(--text-primary)] mt-1.5">
             Your sheets
           </h1>
-          <p className="text-[14px] text-[#9C968F] mt-2">
+          <p className="text-[14px] text-[var(--text-muted)] mt-2">
             Works offline · saved on this device
           </p>
         </div>
@@ -226,9 +225,9 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#1C1B1A] hover:bg-[#242220] border border-[#2D2B2A] text-[13px] font-medium text-[#F5F2EE] transition whitespace-nowrap"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[13px] font-medium text-[var(--text-primary)] transition whitespace-nowrap shadow-xs"
           >
-            <FileJson className="w-4 h-4 text-[#E5A958]" />
+            <FileJson className="w-4 h-4 text-[var(--accent-amber-text)]" />
             <span>Import JSON</span>
           </button>
 
@@ -237,10 +236,10 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
             onClick={() => setShowExportMenu((v) => !v)}
             aria-label="Export JSON options"
             title="Export JSON"
-            className={`w-10 h-10 rounded-full border flex items-center justify-center transition ${
+            className={`w-10 h-10 rounded-full border flex items-center justify-center transition shadow-xs ${
               showExportMenu
-                ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                : 'bg-[#1C1B1A] hover:bg-[#242220] border-[#2D2B2A] text-[#F5F2EE]'
+                ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                : 'bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-[var(--text-primary)]'
             }`}
           >
             <Download className="w-4 h-4" />
@@ -249,21 +248,21 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
           {showExportMenu && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setShowExportMenu(false)} />
-              <div className="absolute right-0 top-12 z-40 w-72 rounded-2xl bg-[#1C1B1A] border border-[#2D2B2A] shadow-2xl p-1.5 text-sm space-y-1">
+              <div className="absolute right-0 top-12 z-40 w-72 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-2xl p-1.5 text-sm space-y-1">
                 <button
                   type="button"
                   onClick={() => {
                     setShowExportMenu(false);
                     onExportLightweightJson();
                   }}
-                  className="w-full px-3.5 py-2.5 rounded-xl text-left hover:bg-[#242220] flex items-start gap-2.5 transition"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-left hover:bg-[var(--bg-elevated)] flex items-start gap-2.5 transition"
                 >
-                  <FileJson className="w-4 h-4 text-[#E5A958] mt-0.5 shrink-0" />
+                  <FileJson className="w-4 h-4 text-[var(--accent-amber-text)] mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-xs font-semibold text-[#F5F2EE]">
+                    <p className="text-xs font-semibold text-[var(--text-primary)]">
                       Export Songs &amp; Setlists JSON (Lightweight)
                     </p>
-                    <p className="text-[11px] text-[#9C968F] mt-0.5">
+                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
                       Small editable sheets &amp; setlists without audio blobs
                     </p>
                   </div>
@@ -274,14 +273,14 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                     setShowExportMenu(false);
                     void onExportFullBackupJson();
                   }}
-                  className="w-full px-3.5 py-2.5 rounded-xl text-left hover:bg-[#242220] flex items-start gap-2.5 transition"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-left hover:bg-[var(--bg-elevated)] flex items-start gap-2.5 transition"
                 >
                   <FileAudio className="w-4 h-4 text-[#6E7BF2] mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-xs font-semibold text-[#F5F2EE]">
+                    <p className="text-xs font-semibold text-[var(--text-primary)]">
                       Export Full Backup JSON (With Custom Audio)
                     </p>
-                    <p className="text-[11px] text-[#9C968F] mt-0.5">
+                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
                       Includes recorded &amp; imported custom voice cues
                     </p>
                   </div>
@@ -293,27 +292,27 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
       </div>
 
       {importFeedback && (
-        <div className="mt-3 px-4 py-2 rounded-xl bg-[#252019] border border-[#E5A958]/40 text-xs text-[#E5A958]">
+        <div className="mt-3 px-4 py-2 rounded-xl bg-[var(--accent-amber-tint)] border border-[#E5A958]/50 text-xs text-[var(--accent-amber-text)]">
           {importFeedback}
         </div>
       )}
 
       {/* Search Bar */}
       <div className="mt-6 relative">
-        <Search className="w-4 h-4 text-[#9C968F] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search songs, artists, keys"
-          className="w-full h-12 pl-11 pr-10 rounded-2xl bg-[#181716] border border-[#2D2B2A] focus:border-[#E5A958]/70 focus:outline-none text-[15px] text-[#F5F2EE] placeholder:text-[#78736D] transition"
+          className="w-full h-12 pl-11 pr-10 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] focus:border-[#E5A958]/70 focus:outline-none text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] transition shadow-xs"
         />
         {searchQuery && (
           <button
             type="button"
             onClick={() => setSearchQuery('')}
             aria-label="Clear search"
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full hover:bg-[#2D2B2A] text-[#9C968F] flex items-center justify-center"
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] flex items-center justify-center"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -321,14 +320,14 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
       </div>
 
       {/* Segmented Pill Toggle */}
-      <div className="mt-4 p-1 rounded-full bg-[#181716] border border-[#2D2B2A] grid grid-cols-2">
+      <div className="mt-4 p-1 rounded-full bg-[var(--bg-panel)] border border-[var(--border-subtle)] grid grid-cols-2 shadow-xs">
         <button
           type="button"
           onClick={() => setActiveTab('songs')}
           className={`py-2.5 rounded-full text-[14px] font-semibold transition whitespace-nowrap tabular-nums ${
             activeTab === 'songs'
               ? 'bg-[#E5A958] text-[#121212] shadow-sm'
-              : 'text-[#9C968F] hover:text-[#F5F2EE]'
+              : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
           Songs {songs.length}
@@ -339,7 +338,7 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
           className={`py-2.5 rounded-full text-[14px] font-semibold transition whitespace-nowrap tabular-nums ${
             activeTab === 'setlists'
               ? 'bg-[#E5A958] text-[#121212] shadow-sm'
-              : 'text-[#9C968F] hover:text-[#F5F2EE]'
+              : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
           Setlists {setlists.length}
@@ -357,29 +356,29 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                 key={song.id}
                 type="button"
                 onClick={() => onSelectSong(song.id)}
-                className="w-full flex items-center justify-between gap-3.5 p-4 rounded-2xl bg-[#1C1B1A] hover:bg-[#22201E] active:scale-[0.99] border border-[#2D2B2A] text-left transition group"
+                className="w-full flex items-center justify-between gap-3.5 p-4 rounded-2xl bg-[var(--bg-surface)] hover:bg-[var(--bg-hover)] active:scale-[0.99] border border-[var(--border-subtle)] text-left transition group shadow-xs"
               >
                 <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="w-11 h-11 rounded-full bg-[#2B2318] border border-[#E5A958]/20 text-[#E5A958] font-bold text-[15px] flex items-center justify-center shrink-0">
+                  <div className="w-11 h-11 rounded-full bg-[var(--accent-amber-tint-strong)] border border-[#E5A958]/30 text-[var(--accent-amber-text)] font-bold text-[15px] flex items-center justify-center shrink-0">
                     {displayKey}
                   </div>
                   <div className="min-w-0">
-                    <h2 className="font-serif-display text-[17px] font-bold text-[#F5F2EE] truncate">
+                    <h2 className="font-serif-display text-[17px] font-bold text-[var(--text-primary)] truncate">
                       {song.title}
                     </h2>
-                    <p className="text-[13px] text-[#9C968F] truncate mt-0.5 tabular-nums">
+                    <p className="text-[13px] text-[var(--text-muted)] truncate mt-0.5 tabular-nums">
                       {song.artist} · {totalBars} bars · {song.bpm} bpm
                     </p>
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-[#78736D] group-hover:text-[#F5F2EE] shrink-0 transition" />
+                <ChevronRight className="w-4 h-4 text-[var(--text-subtle)] group-hover:text-[var(--text-primary)] shrink-0 transition" />
               </button>
             );
           })}
 
           {filteredSongs.length === 0 && (
-            <div className="md:col-span-2 py-12 text-center rounded-2xl bg-[#1C1B1A] border border-[#2D2B2A]">
-              <p className="text-[#9C968F] text-sm">No songs match &ldquo;{searchQuery}&rdquo;.</p>
+            <div className="md:col-span-2 py-12 text-center rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+              <p className="text-[var(--text-muted)] text-sm">No songs match &ldquo;{searchQuery}&rdquo;.</p>
             </div>
           )}
         </div>
@@ -394,62 +393,62 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
             return (
               <div
                 key={setlist.id}
-                className="rounded-2xl bg-[#1C1B1A] border border-[#2D2B2A] overflow-hidden"
+                className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden shadow-xs"
               >
                 <button
                   type="button"
                   onClick={() =>
                     setExpandedSetlists((prev) => ({ ...prev, [setlist.id]: !prev[setlist.id] }))
                   }
-                  className="w-full flex items-center justify-between gap-3.5 p-4 hover:bg-[#22201E] transition text-left"
+                  className="w-full flex items-center justify-between gap-3.5 p-4 hover:bg-[var(--bg-hover)] transition text-left"
                 >
                   <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                    <div className="w-11 h-11 rounded-full bg-[#242220] border border-[#2D2B2A] text-[#E5A958] flex items-center justify-center shrink-0">
+                    <div className="w-11 h-11 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--accent-amber-text)] flex items-center justify-center shrink-0">
                       <ListMusic className="w-5 h-5" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h2 className="font-serif-display text-[18px] font-bold text-[#F5F2EE] truncate">
+                      <h2 className="font-serif-display text-[18px] font-bold text-[var(--text-primary)] truncate">
                         {setlist.name}
                       </h2>
-                      <p className="text-[13px] text-[#9C968F] mt-0.5 tabular-nums">
+                      <p className="text-[13px] text-[var(--text-muted)] mt-0.5 tabular-nums">
                         {setlistSongs.length} {setlistSongs.length === 1 ? 'song' : 'songs'}
                       </p>
                     </div>
                   </div>
                   {isExpanded ? (
-                    <ChevronUp className="w-4 h-4 text-[#9C968F] shrink-0" />
+                    <ChevronUp className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
                   ) : (
-                    <ChevronDown className="w-4 h-4 text-[#9C968F] shrink-0" />
+                    <ChevronDown className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
                   )}
                 </button>
 
                 {isExpanded && (
-                  <div className="px-4 pb-4 pt-1 border-t border-[#2D2B2A]/80 space-y-2">
+                  <div className="px-4 pb-4 pt-2 border-t border-[var(--border-subtle)] space-y-2">
                     {setlistSongs.length === 0 ? (
-                      <p className="text-xs text-[#9C968F] py-2">
+                      <p className="text-xs text-[var(--text-muted)] py-2">
                         No songs in this setlist yet.
                       </p>
                     ) : (
                       setlistSongs.map((s, idx) => (
                         <div
                           key={`${setlist.id}-${s.id}-${idx}`}
-                          className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-[#151413] border border-[#2D2B2A]/70"
+                          className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)]"
                         >
                           <button
                             type="button"
                             onClick={() => onSelectSong(s.id)}
                             className="flex items-center gap-3 min-w-0 flex-1 text-left"
                           >
-                            <span className="text-xs text-[#78736D] tabular-nums w-4">
+                            <span className="text-xs text-[var(--text-subtle)] tabular-nums w-4">
                               {idx + 1}.
                             </span>
-                            <span className="w-7 h-7 rounded-full bg-[#2B2318] text-[#E5A958] text-xs font-bold flex items-center justify-center shrink-0">
+                            <span className="w-7 h-7 rounded-full bg-[var(--accent-amber-tint-strong)] text-[var(--accent-amber-text)] text-xs font-bold flex items-center justify-center shrink-0">
                               {transposeKey(s.key, s.transpose || 0)}
                             </span>
-                            <span className="text-sm font-medium text-[#F5F2EE] truncate">
+                            <span className="text-sm font-medium text-[var(--text-primary)] truncate">
                               {s.title}
                             </span>
-                            <span className="text-xs text-[#9C968F] tabular-nums hidden sm:inline">
+                            <span className="text-xs text-[var(--text-muted)] tabular-nums hidden sm:inline">
                               {s.bpm} bpm
                             </span>
                           </button>
@@ -459,7 +458,7 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                               type="button"
                               onClick={() => onPlaySongFromSetlist(s.id)}
                               aria-label={`Play ${s.title}`}
-                              className="w-8 h-8 rounded-full bg-[#E5A958]/15 hover:bg-[#E5A958]/25 text-[#E5A958] flex items-center justify-center"
+                              className="w-8 h-8 rounded-full bg-[#E5A958]/20 hover:bg-[#E5A958]/30 text-[var(--accent-amber-text)] flex items-center justify-center"
                             >
                               <Play className="w-3.5 h-3.5 fill-current" />
                             </button>
@@ -468,7 +467,7 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                                 type="button"
                                 onClick={() => onRemoveSongFromSetlist(setlist.id, s.id)}
                                 aria-label={`Remove ${s.title} from setlist`}
-                                className="w-8 h-8 rounded-full hover:bg-red-500/15 text-[#9C968F] hover:text-red-400 flex items-center justify-center"
+                                className="w-8 h-8 rounded-full hover:bg-red-500/15 text-[var(--text-muted)] hover:text-red-500 flex items-center justify-center"
                               >
                                 <X className="w-3.5 h-3.5" />
                               </button>
@@ -484,7 +483,7 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                           <button
                             type="button"
                             onClick={() => setAddSongTargetSetlistId(setlist.id)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#242220] hover:bg-[#2D2B2A] text-xs font-medium text-[#E5A958]"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--accent-amber-text)]"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             <span>Add song</span>
@@ -495,9 +494,9 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                           type="button"
                           onClick={() => onExportSetlistJson(setlist.id)}
                           title={`Export ${setlist.name} JSON`}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#242220] hover:bg-[#2D2B2A] border border-[#2D2B2A] text-xs font-medium text-[#F5F2EE] transition"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] transition"
                         >
-                          <Download className="w-3.5 h-3.5 text-[#E5A958]" />
+                          <Download className="w-3.5 h-3.5 text-[var(--accent-amber-text)]" />
                           <span>Export Setlist</span>
                         </button>
                       </div>
@@ -506,7 +505,7 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                         <button
                           type="button"
                           onClick={() => onDeleteSetlist(setlist.id)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full hover:bg-red-500/15 text-xs text-red-400/90"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full hover:bg-red-500/15 text-xs text-red-500"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>Delete</span>
@@ -519,7 +518,7 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
             );
           })}
 
-          <p className="text-[13px] text-[#9C968F] pt-3 px-1 leading-relaxed">
+          <p className="text-[13px] text-[var(--text-muted)] pt-3 px-1 leading-relaxed">
             Everything stays on this device — saved locally, works without a connection.
           </p>
         </div>
@@ -533,7 +532,7 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
             onClick={() =>
               activeTab === 'songs' ? setShowNewSongModal(true) : setShowNewSetlistModal(true)
             }
-            className="pointer-events-auto inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-[#E5A958] hover:bg-[#ecb66c] active:scale-95 text-[#121212] font-semibold text-[15px] shadow-xl shadow-black/50 transition"
+            className="pointer-events-auto inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-[#E5A958] hover:bg-[#ecb66c] active:scale-95 text-[#121212] font-semibold text-[15px] shadow-xl shadow-black/25 transition"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>{activeTab === 'songs' ? 'New song' : 'New setlist'}</span>
@@ -543,24 +542,27 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
 
       {/* New Song Modal */}
       {showNewSongModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-xs p-0 sm:p-4">
+        <div
+          style={{ backgroundColor: 'var(--bg-backdrop)' }}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center backdrop-blur-xs p-0 sm:p-4"
+        >
           <form
             onSubmit={handleCreateSongSubmit}
-            className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-[#1C1B1A] border border-[#2D2B2A] p-6 shadow-2xl space-y-4"
+            className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-6 shadow-2xl space-y-4"
           >
             <div className="flex items-center justify-between">
-              <h2 className="font-serif-display text-2xl font-bold text-[#F5F2EE]">New song</h2>
+              <h2 className="font-serif-display text-2xl font-bold text-[var(--text-primary)]">New song</h2>
               <button
                 type="button"
                 onClick={() => setShowNewSongModal(false)}
-                className="w-9 h-9 rounded-full bg-[#242220] text-[#F5F2EE] flex items-center justify-center"
+                className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] text-[var(--text-primary)] flex items-center justify-center"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div>
-              <label className="block text-xs tracking-wider uppercase text-[#9C968F] mb-1.5">
+              <label className="block text-xs tracking-wider uppercase text-[var(--text-muted)] mb-1.5">
                 Song title
               </label>
               <input
@@ -569,12 +571,12 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder="e.g. Raththaran Neth"
-                className="w-full h-11 px-3.5 rounded-xl bg-[#141312] border border-[#2D2B2A] text-sm text-[#F5F2EE] focus:border-[#E5A958] focus:outline-none"
+                className="w-full h-11 px-3.5 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] focus:border-[#E5A958] focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs tracking-wider uppercase text-[#9C968F] mb-1.5">
+              <label className="block text-xs tracking-wider uppercase text-[var(--text-muted)] mb-1.5">
                 Artist
               </label>
               <input
@@ -582,19 +584,19 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                 value={newArtist}
                 onChange={(e) => setNewArtist(e.target.value)}
                 placeholder="e.g. Victor Rathnayake"
-                className="w-full h-11 px-3.5 rounded-xl bg-[#141312] border border-[#2D2B2A] text-sm text-[#F5F2EE] focus:border-[#E5A958] focus:outline-none"
+                className="w-full h-11 px-3.5 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] focus:border-[#E5A958] focus:outline-none"
               />
             </div>
 
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs tracking-wider uppercase text-[#9C968F] mb-1.5">
+                <label className="block text-xs tracking-wider uppercase text-[var(--text-muted)] mb-1.5">
                   Key
                 </label>
                 <select
                   value={newKey}
                   onChange={(e) => setNewKey(e.target.value)}
-                  className="w-full h-11 px-3 rounded-xl bg-[#141312] border border-[#2D2B2A] text-sm text-[#F5F2EE] focus:border-[#E5A958] focus:outline-none"
+                  className="w-full h-11 px-3 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] focus:border-[#E5A958] focus:outline-none"
                 >
                   {['C', 'Cm', 'D', 'Dm', 'Eb', 'E', 'Em', 'F', 'Fm', 'G', 'Gm', 'Ab', 'A', 'Am', 'Bb', 'Bm', 'B'].map(
                     (k) => (
@@ -606,7 +608,7 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-xs tracking-wider uppercase text-[#9C968F] mb-1.5">
+                <label className="block text-xs tracking-wider uppercase text-[var(--text-muted)] mb-1.5">
                   BPM
                 </label>
                 <input
@@ -615,17 +617,17 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                   max={300}
                   value={newBpm}
                   onChange={(e) => setNewBpm(Number(e.target.value))}
-                  className="w-full h-11 px-3 rounded-xl bg-[#141312] border border-[#2D2B2A] text-sm text-[#F5F2EE] tabular-nums focus:border-[#E5A958] focus:outline-none"
+                  className="w-full h-11 px-3 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] tabular-nums focus:border-[#E5A958] focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs tracking-wider uppercase text-[#9C968F] mb-1.5">
+                <label className="block text-xs tracking-wider uppercase text-[var(--text-muted)] mb-1.5">
                   Meter
                 </label>
                 <select
                   value={newMeter}
                   onChange={(e) => setNewMeter(e.target.value as '4/4' | '3/4' | '6/8')}
-                  className="w-full h-11 px-3 rounded-xl bg-[#141312] border border-[#2D2B2A] text-sm text-[#F5F2EE] focus:border-[#E5A958] focus:outline-none"
+                  className="w-full h-11 px-3 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] focus:border-[#E5A958] focus:outline-none"
                 >
                   <option value="4/4">4/4</option>
                   <option value="3/4">3/4</option>
@@ -644,16 +646,16 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
             <button
               type="button"
               onClick={() => void handleCopySongTemplate()}
-              className="w-full h-10 rounded-full bg-[#141312] hover:bg-[#242220] border border-[#2D2B2A] text-xs font-medium text-[#9C968F] hover:text-[#F5F2EE] flex items-center justify-center gap-1.5 transition"
+              className="w-full h-10 rounded-full bg-[var(--bg-recessed)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center gap-1.5 transition"
             >
               {copiedTemplate ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-[#E5A958]" />
-                  <span className="text-[#E5A958]">Song JSON Template Copied!</span>
+                  <Check className="w-3.5 h-3.5 text-[var(--accent-amber-text)]" />
+                  <span className="text-[var(--accent-amber-text)]">Song JSON Template Copied!</span>
                 </>
               ) : (
                 <>
-                  <Copy className="w-3.5 h-3.5 text-[#E5A958]" />
+                  <Copy className="w-3.5 h-3.5 text-[var(--accent-amber-text)]" />
                   <span>Copy Song JSON Template</span>
                 </>
               )}
@@ -664,24 +666,27 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
 
       {/* New Setlist Modal */}
       {showNewSetlistModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-xs p-0 sm:p-4">
+        <div
+          style={{ backgroundColor: 'var(--bg-backdrop)' }}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center backdrop-blur-xs p-0 sm:p-4"
+        >
           <form
             onSubmit={handleCreateSetlistSubmit}
-            className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-[#1C1B1A] border border-[#2D2B2A] p-6 shadow-2xl space-y-4"
+            className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-6 shadow-2xl space-y-4"
           >
             <div className="flex items-center justify-between">
-              <h2 className="font-serif-display text-2xl font-bold text-[#F5F2EE]">New setlist</h2>
+              <h2 className="font-serif-display text-2xl font-bold text-[var(--text-primary)]">New setlist</h2>
               <button
                 type="button"
                 onClick={() => setShowNewSetlistModal(false)}
-                className="w-9 h-9 rounded-full bg-[#242220] text-[#F5F2EE] flex items-center justify-center"
+                className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] text-[var(--text-primary)] flex items-center justify-center"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div>
-              <label className="block text-xs tracking-wider uppercase text-[#9C968F] mb-1.5">
+              <label className="block text-xs tracking-wider uppercase text-[var(--text-muted)] mb-1.5">
                 Setlist name
               </label>
               <input
@@ -690,7 +695,7 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                 value={newSetlistName}
                 onChange={(e) => setNewSetlistName(e.target.value)}
                 placeholder="e.g. Friday Wedding Gig"
-                className="w-full h-11 px-3.5 rounded-xl bg-[#141312] border border-[#2D2B2A] text-sm text-[#F5F2EE] focus:border-[#E5A958] focus:outline-none"
+                className="w-full h-11 px-3.5 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] focus:border-[#E5A958] focus:outline-none"
               />
             </div>
 
@@ -706,16 +711,19 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
 
       {/* Add Song to Setlist Picker Modal */}
       {addSongTargetSetlistId && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-xs p-0 sm:p-4">
-          <div className="w-full max-w-md max-h-[75vh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#1C1B1A] border border-[#2D2B2A] p-6 shadow-2xl">
+        <div
+          style={{ backgroundColor: 'var(--bg-backdrop)' }}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center backdrop-blur-xs p-0 sm:p-4"
+        >
+          <div className="w-full max-w-md max-h-[75vh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-3">
-              <h2 className="font-serif-display text-xl font-bold text-[#F5F2EE]">
+              <h2 className="font-serif-display text-xl font-bold text-[var(--text-primary)]">
                 Add song to setlist
               </h2>
               <button
                 type="button"
                 onClick={() => setAddSongTargetSetlistId(null)}
-                className="w-9 h-9 rounded-full bg-[#242220] text-[#F5F2EE] flex items-center justify-center"
+                className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] text-[var(--text-primary)] flex items-center justify-center"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -729,18 +737,18 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                     onAddSongToSetlist(addSongTargetSetlistId, s.id);
                     setAddSongTargetSetlistId(null);
                   }}
-                  className="w-full flex items-center justify-between gap-3 p-3 rounded-xl bg-[#151413] hover:bg-[#242220] border border-[#2D2B2A] text-left"
+                  className="w-full flex items-center justify-between gap-3 p-3 rounded-xl bg-[var(--bg-recessed)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-left"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="w-8 h-8 rounded-full bg-[#2B2318] text-[#E5A958] text-xs font-bold flex items-center justify-center shrink-0">
+                    <span className="w-8 h-8 rounded-full bg-[var(--accent-amber-tint-strong)] text-[var(--accent-amber-text)] text-xs font-bold flex items-center justify-center shrink-0">
                       {transposeKey(s.key, s.transpose || 0)}
                     </span>
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-[#F5F2EE] truncate">{s.title}</div>
-                      <div className="text-xs text-[#9C968F] truncate">{s.artist}</div>
+                      <div className="text-sm font-medium text-[var(--text-primary)] truncate">{s.title}</div>
+                      <div className="text-xs text-[var(--text-muted)] truncate">{s.artist}</div>
                     </div>
                   </div>
-                  <Plus className="w-4 h-4 text-[#E5A958] shrink-0" />
+                  <Plus className="w-4 h-4 text-[var(--accent-amber-text)] shrink-0" />
                 </button>
               ))}
             </div>

@@ -24,7 +24,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
         className={
           variant === 'banner'
             ? 'w-full flex items-center justify-center gap-2 rounded-xl bg-[#E5A958] text-[#121212] font-semibold px-4 py-2.5 text-sm shadow-md hover:bg-[#ecb66c] transition active:scale-[0.98]'
-            : 'w-full flex items-center justify-center gap-2 rounded-xl bg-[#242220] hover:bg-[#2D2B2A] border border-[#E5A958]/40 text-[#E5A958] font-medium px-4 py-2.5 text-sm transition'
+            : 'w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border border-[#E5A958]/40 text-[var(--accent-amber-text)] font-medium px-4 py-2.5 text-sm transition'
         }
       >
         <Download className="w-4 h-4" />
@@ -41,33 +41,45 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           onClick={() => setShowIOSGuide(true)}
           className={
             variant === 'banner'
-              ? 'w-full flex items-center justify-center gap-2 rounded-xl bg-[#1C1B1A] border border-[#E5A958]/50 text-[#E5A958] font-medium px-4 py-2.5 text-sm hover:bg-[#242220] transition'
-              : 'w-full flex items-center justify-center gap-2 rounded-xl bg-[#242220] border border-[#2D2B2A] text-[#F5F2EE] font-medium px-4 py-2.5 text-sm hover:bg-[#2D2B2A] transition'
+              ? 'w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--bg-surface)] border border-[#E5A958]/50 text-[var(--accent-amber-text)] font-medium px-4 py-2.5 text-sm hover:bg-[var(--bg-elevated)] transition'
+              : 'w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-medium px-4 py-2.5 text-sm hover:bg-[var(--bg-hover)] transition'
           }
         >
-          <Smartphone className="w-4 h-4 text-[#E5A958]" />
+          <Smartphone className="w-4 h-4 text-[var(--accent-amber-text)]" />
           <span>Install {appName} on iPhone</span>
         </button>
 
         {showIOSGuide && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
-            <div className="w-full max-w-sm rounded-3xl bg-[#1C1B1A] border border-[#2D2B2A] p-6 shadow-2xl">
+          <div
+            style={{ backgroundColor: 'var(--bg-backdrop)' }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          >
+            <div className="w-full max-w-sm rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-6 shadow-2xl">
               <div className="flex items-center justify-between">
-                <h3 className="font-serif-display text-xl font-bold text-[#F5F2EE]">
+                <h3 className="font-serif-display text-xl font-bold text-[var(--text-primary)]">
                   Add {appName}
                 </h3>
                 <button
                   type="button"
                   onClick={() => setShowIOSGuide(false)}
-                  className="w-9 h-9 rounded-full bg-[#242220] text-[#F5F2EE] flex items-center justify-center"
+                  className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] text-[var(--text-primary)] flex items-center justify-center"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <ol className="mt-4 space-y-2.5 text-sm text-[#9C968F]">
-                <li>1. Tap the <strong className="text-[#F5F2EE]">Share</strong> button in Safari&apos;s toolbar.</li>
-                <li>2. Scroll down and tap <strong className="text-[#F5F2EE]">Add to Home Screen</strong>.</li>
-                <li>3. Tap <strong className="text-[#F5F2EE]">Add</strong> to launch {appName} full-screen offline.</li>
+              <ol className="mt-4 space-y-2.5 text-sm text-[var(--text-muted)]">
+                <li>
+                  1. Tap the <strong className="text-[var(--text-primary)]">Share</strong> button in
+                  Safari&apos;s toolbar.
+                </li>
+                <li>
+                  2. Scroll down and tap{' '}
+                  <strong className="text-[var(--text-primary)]">Add to Home Screen</strong>.
+                </li>
+                <li>
+                  3. Tap <strong className="text-[var(--text-primary)]">Add</strong> to launch{' '}
+                  {appName} full-screen offline.
+                </li>
               </ol>
               <button
                 type="button"

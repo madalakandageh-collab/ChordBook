@@ -110,18 +110,21 @@ export const ExportAudioModal: React.FC<ExportAudioModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-xs p-0 sm:p-4">
+    <div
+      style={{ backgroundColor: 'var(--bg-backdrop)' }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center backdrop-blur-xs p-0 sm:p-4"
+    >
       <div className="fixed inset-0" onClick={() => !isExporting && onClose()} aria-hidden="true" />
-      <div className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-[#181716] border border-[#2D2B2A] p-6 shadow-2xl space-y-5">
+      <div className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-6 shadow-2xl space-y-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-medium tracking-[0.2em] text-[#E5A958] uppercase">
+            <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--accent-amber-text)] uppercase">
               OFFLINE AUDIO RENDERER
             </p>
-            <h2 className="font-serif-display text-2xl font-bold text-[#F5F2EE] mt-0.5">
+            <h2 className="font-serif-display text-2xl font-bold text-[var(--text-primary)] mt-0.5">
               Export Audio Track
             </h2>
-            <p className="text-xs text-[#9C968F] mt-1 tabular-nums">
+            <p className="text-xs text-[var(--text-muted)] mt-1 tabular-nums">
               {song.title} · {totalBars} bars · ~{formatDuration(estimatedSec)}
             </p>
           </div>
@@ -130,7 +133,7 @@ export const ExportAudioModal: React.FC<ExportAudioModalProps> = ({
             disabled={isExporting}
             onClick={onClose}
             aria-label="Close Export Audio modal"
-            className="w-9 h-9 rounded-full bg-[#242220] text-[#F5F2EE] flex items-center justify-center disabled:opacity-40"
+            className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-center disabled:opacity-40"
           >
             <X className="w-4 h-4" />
           </button>
@@ -138,7 +141,7 @@ export const ExportAudioModal: React.FC<ExportAudioModalProps> = ({
 
         {/* Mix Mode Toggle */}
         <div className="space-y-2">
-          <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
+          <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
             TRACK MIX MODE
           </p>
           <div className="grid grid-cols-1 gap-2">
@@ -148,24 +151,28 @@ export const ExportAudioModal: React.FC<ExportAudioModalProps> = ({
               onClick={() => setMixMode('click-cues')}
               className={`p-3.5 rounded-2xl border text-left transition flex items-start gap-3 ${
                 mixMode === 'click-cues'
-                  ? 'bg-[#252019] border-[#E5A958]'
-                  : 'bg-[#141312] border-[#2D2B2A] hover:bg-[#1C1B1A]'
+                  ? 'bg-[var(--accent-amber-tint)] border-[#E5A958]'
+                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)]'
               }`}
             >
               <Radio
                 className={`w-4 h-4 mt-0.5 shrink-0 ${
-                  mixMode === 'click-cues' ? 'text-[#E5A958]' : 'text-[#9C968F]'
+                  mixMode === 'click-cues'
+                    ? 'text-[var(--accent-amber-text)]'
+                    : 'text-[var(--text-muted)]'
                 }`}
               />
               <div>
                 <p
                   className={`text-sm font-semibold ${
-                    mixMode === 'click-cues' ? 'text-[#E5A958]' : 'text-[#F5F2EE]'
+                    mixMode === 'click-cues'
+                      ? 'text-[var(--accent-amber-text)]'
+                      : 'text-[var(--text-primary)]'
                   }`}
                 >
                   Click + Voice Cues Only (Default)
                 </p>
-                <p className="text-xs text-[#9C968F] mt-0.5">
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">
                   Cubase-style click track + voice cues &amp; 1–7 counts for DAW backing tracks
                 </p>
               </div>
@@ -177,24 +184,28 @@ export const ExportAudioModal: React.FC<ExportAudioModalProps> = ({
               onClick={() => setMixMode('full-mix')}
               className={`p-3.5 rounded-2xl border text-left transition flex items-start gap-3 ${
                 mixMode === 'full-mix'
-                  ? 'bg-[#252019] border-[#E5A958]'
-                  : 'bg-[#141312] border-[#2D2B2A] hover:bg-[#1C1B1A]'
+                  ? 'bg-[var(--accent-amber-tint)] border-[#E5A958]'
+                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)]'
               }`}
             >
               <Music2
                 className={`w-4 h-4 mt-0.5 shrink-0 ${
-                  mixMode === 'full-mix' ? 'text-[#E5A958]' : 'text-[#9C968F]'
+                  mixMode === 'full-mix'
+                    ? 'text-[var(--accent-amber-text)]'
+                    : 'text-[var(--text-muted)]'
                 }`}
               />
               <div>
                 <p
                   className={`text-sm font-semibold ${
-                    mixMode === 'full-mix' ? 'text-[#E5A958]' : 'text-[#F5F2EE]'
+                    mixMode === 'full-mix'
+                      ? 'text-[var(--accent-amber-text)]'
+                      : 'text-[var(--text-primary)]'
                   }`}
                 >
                   Full Mix (Click + Cues + Chords)
                 </p>
-                <p className="text-xs text-[#9C968F] mt-0.5">
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">
                   Includes synthesized chord accompaniment alongside click and voice cues
                 </p>
               </div>
@@ -203,18 +214,18 @@ export const ExportAudioModal: React.FC<ExportAudioModalProps> = ({
         </div>
 
         {/* Active Mixer Snapshot */}
-        <div className="rounded-2xl bg-[#141312] border border-[#2D2B2A] px-4 py-3 text-xs text-[#9C968F] space-y-1 tabular-nums">
+        <div className="rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] px-4 py-3 text-xs text-[var(--text-muted)] space-y-1 tabular-nums">
           <div className="flex justify-between">
             <span>Cubase Click ({settings.clickBalance})</span>
-            <span className="text-[#F5F2EE] font-medium">{settings.clickVolume}%</span>
+            <span className="text-[var(--text-primary)] font-medium">{settings.clickVolume}%</span>
           </div>
           <div className="flex justify-between">
             <span>Voice Cues &amp; Counts ({settings.voiceBalance})</span>
-            <span className="text-[#F5F2EE] font-medium">{settings.voiceVolume}%</span>
+            <span className="text-[var(--text-primary)] font-medium">{settings.voiceVolume}%</span>
           </div>
           <div className="flex justify-between">
             <span>Count-in Bar</span>
-            <span className="text-[#F5F2EE] font-medium">
+            <span className="text-[var(--text-primary)] font-medium">
               {settings.countInBar ? 'Included' : 'Off'}
             </span>
           </div>
@@ -224,10 +235,10 @@ export const ExportAudioModal: React.FC<ExportAudioModalProps> = ({
         {(isExporting || progress > 0) && (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[#E5A958] font-medium">{stageText}</span>
-              <span className="text-[#F5F2EE] tabular-nums">{progress}%</span>
+              <span className="text-[var(--accent-amber-text)] font-medium">{stageText}</span>
+              <span className="text-[var(--text-primary)] tabular-nums">{progress}%</span>
             </div>
-            <div className="w-full h-2 rounded-full bg-[#141312] overflow-hidden border border-[#2D2B2A]">
+            <div className="w-full h-2 rounded-full bg-[var(--bg-recessed)] overflow-hidden border border-[var(--border-subtle)]">
               <div
                 className="h-full bg-[#E5A958] transition-all duration-150"
                 style={{ width: `${progress}%` }}
@@ -236,7 +247,7 @@ export const ExportAudioModal: React.FC<ExportAudioModalProps> = ({
           </div>
         )}
 
-        {errorMsg && <p className="text-xs text-red-400">{errorMsg}</p>}
+        {errorMsg && <p className="text-xs text-red-500">{errorMsg}</p>}
 
         {/* Export Format Buttons */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
@@ -256,9 +267,9 @@ export const ExportAudioModal: React.FC<ExportAudioModalProps> = ({
             type="button"
             disabled={isExporting}
             onClick={() => void handleExport('mp3')}
-            className="h-12 px-4 rounded-full bg-[#242220] hover:bg-[#2D2B2A] disabled:opacity-50 border border-[#E5A958]/40 text-[#F5F2EE] font-semibold text-sm flex items-center justify-center gap-2 transition"
+            className="h-12 px-4 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] disabled:opacity-50 border border-[#E5A958]/50 text-[var(--text-primary)] font-semibold text-sm flex items-center justify-center gap-2 transition"
           >
-            <Download className="w-4 h-4 text-[#E5A958]" />
+            <Download className="w-4 h-4 text-[var(--accent-amber-text)]" />
             <span>
               {isExporting && exportFormat === 'mp3' ? 'Encoding...' : 'MP3 (Stereo)'}
             </span>

@@ -14,7 +14,9 @@ import { SheetsHomeScreen, type ImportedJsonPayload } from './components/SheetsH
 import { SimpleMemberView } from './components/SimpleMemberView';
 import { TopBar } from './components/TopBar';
 import { INITIAL_SETLISTS, INITIAL_SONGS } from './data/initialSongs';
+import { useMediaSession } from './hooks/useMediaSession';
 import { useRoomSync } from './hooks/useRoomSync';
+import { useWakeLock } from './hooks/useWakeLock';
 import type {
   Bar,
   LyricSection,
@@ -30,6 +32,13 @@ import {
   exportCustomVoiceCuesAsBase64,
   importCustomVoiceCuesFromBase64,
 } from './utils/voiceCues';
+import {
+  LEADER_THEME_KEY,
+  applyDocumentTheme,
+  loadThemePreference,
+  saveThemePreference,
+  type ThemeMode,
+} from './utils/theme';
 
 const STORAGE_KEYS = {
   songs: 'chordbook_songs_v1',
@@ -88,6 +97,9 @@ export default function App() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [leaderTheme, setLeaderTheme] = useState<ThemeMode>(() =>
+    loadThemePreference(LEADER_THEME_KEY)
+  );
 
   // Playback & Practice state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -181,6 +193,17 @@ export default function App() {
 
   // Real-time Sync Engine
   const isMemberRole = isDedicatedMemberUrl || screen === 'member';
+
+  // Persist & apply Band Leader theme whenever Leader UI is active
+  useEffect(() => {
+    if (isMemberRole) return;
+    saveThemePreference(LEADER_THEME_KEY, leaderTheme);
+    applyDocumentTheme(leaderTheme);
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) {
+      themeMeta.setAttribute('content', '#6E7BF2');
+    }
+  }, [leaderTheme, isMemberRole]);
   const {
     status: syncStatus,
     presence,
@@ -269,7 +292,7 @@ export default function App() {
 
   useEffect(() => {
     return () => {
-      audioEngineRef.current?.stop(false);
+      audioEngineRef.current?.destroy();
     };
   }, []);
 
@@ -312,6 +335,19 @@ export default function App() {
       startPlaybackFromIndex(0);
     }
   }, [isPlaying, stopPlayback, startPlaybackFromIndex]);
+
+  // Keep Screen Wake Lock active while playing (manual hardware screen lock still keeps audio playing)
+  useWakeLock(isPlaying && !isMemberRole);
+
+  // Lock-screen & media notification controls via Media Session API
+  useMediaSession({
+    isPlaying: isPlaying && !isMemberRole,
+    song: !isMemberRole ? activeSong : null,
+    onPlay: useCallback(() => {
+      if (!isPlaying) startPlaybackFromIndex(0);
+    }, [isPlaying, startPlaybackFromIndex]),
+    onStop: stopPlayback,
+  });
 
   // Song Update Helper
   const updateActiveSong = useCallback(
@@ -529,12 +565,16 @@ export default function App() {
   const showTopBlueBar = screen !== 'practice-player';
 
   return (
-    <div className="min-h-screen bg-[#121212] text-[#F5F2EE]">
+    <div className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] transition-colors">
       {showTopBlueBar && (
         <TopBar
           onOpenMenu={() => setIsDrawerOpen(true)}
           isLocked={isLocked}
           onToggleLock={() => setIsLocked((v) => !v)}
+          theme={leaderTheme}
+          onToggleTheme={() =>
+            setLeaderTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+          }
         />
       )}
 

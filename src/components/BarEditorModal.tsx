@@ -125,32 +125,35 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-xs">
+    <div
+      style={{ backgroundColor: 'var(--bg-backdrop)' }}
+      className="fixed inset-0 z-50 flex items-end justify-center backdrop-blur-xs"
+    >
       <div className="fixed inset-0" onClick={onClose} aria-hidden="true" />
-      <div className="relative z-10 w-full max-w-xl max-h-[90vh] flex flex-col rounded-t-3xl bg-[#181716] border-t border-x border-[#2D2B2A] shadow-2xl">
+      <div className="relative z-10 w-full max-w-xl max-h-[90vh] flex flex-col rounded-t-3xl bg-[var(--bg-panel)] border-t border-x border-[var(--border-subtle)] shadow-2xl">
         {/* Drag Handle */}
         <div className="pt-3 pb-1 flex justify-center shrink-0">
-          <div className="w-10 h-1 rounded-full bg-[#3A3734]" />
+          <div className="w-10 h-1 rounded-full bg-[var(--drag-handle)]" />
         </div>
 
         {/* Sticky Modal Header */}
-        <div className="px-5 pb-3.5 flex items-start justify-between border-b border-[#2D2B2A]/60 shrink-0">
+        <div className="px-5 pb-3.5 flex items-start justify-between border-b border-[var(--border-subtle)] shrink-0">
           <div>
             <div className="flex items-center gap-2.5">
-              <h2 className="font-serif-display text-[26px] font-bold text-[#F5F2EE] leading-tight">
+              <h2 className="font-serif-display text-[26px] font-bold text-[var(--text-primary)] leading-tight">
                 Bar {barNumber}
               </h2>
               <span
                 className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase border ${
                   mode === 'cues'
-                    ? 'bg-[#252019] border-[#E5A958]/60 text-[#E5A958]'
-                    : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#9C968F]'
+                    ? 'bg-[var(--accent-amber-tint)] border-[#E5A958]/60 text-[var(--accent-amber-text)]'
+                    : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)]'
                 }`}
               >
                 {mode === 'cues' ? 'Cues & Settings' : 'Chords Mode'}
               </span>
             </div>
-            <p className="text-[13px] text-[#9C968F] mt-0.5 tabular-nums">
+            <p className="text-[13px] text-[var(--text-muted)] mt-0.5 tabular-nums">
               {sectionName} · {effectiveTempo} bpm · {effectiveMeter}
             </p>
           </div>
@@ -158,7 +161,7 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Close Bar Editor"
-            className="w-10 h-10 rounded-full bg-[#242220] hover:bg-[#2D2B2A] text-[#F5F2EE] flex items-center justify-center transition"
+            className="w-10 h-10 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-center transition"
           >
             <X className="w-4 h-4" />
           </button>
@@ -172,15 +175,15 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
               {/* BEAT SPLIT SLOTS */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
-                    <SplitSquareHorizontal className="w-3.5 h-3.5 text-[#E5A958]" />
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
+                    <SplitSquareHorizontal className="w-3.5 h-3.5 text-[var(--accent-amber-text)]" />
                     <span>BEAT SPLIT SLOTS ({effectiveBeats} BEATS)</span>
                   </span>
                   {beatSplitsEnabled && (
                     <button
                       type="button"
                       onClick={handleClearBeatSplits}
-                      className="text-xs text-[#9C968F] hover:text-[#E5A958]"
+                      className="text-xs text-[var(--text-muted)] hover:text-[var(--accent-amber-text)]"
                     >
                       Single chord
                     </button>
@@ -193,12 +196,12 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                     onClick={() => setActiveBeatSlot(null)}
                     className={`h-11 rounded-xl border text-xs font-semibold transition flex flex-col items-center justify-center ${
                       activeBeatSlot === null
-                        ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                        : 'bg-[#141312] border-[#2D2B2A] text-[#9C968F] hover:text-[#F5F2EE]'
+                        ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                        : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                     }`}
                   >
                     <span className="text-[10px] opacity-80">Whole</span>
-                    <span className="font-serif-display text-sm font-bold text-[#F5F2EE] truncate max-w-full px-1">
+                    <span className="font-serif-display text-sm font-bold text-[var(--text-primary)] truncate max-w-full px-1">
                       {formatChordDisplay(bar.chord)}
                     </span>
                   </button>
@@ -212,12 +215,12 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                         onClick={() => setActiveBeatSlot(idx)}
                         className={`h-11 rounded-xl border text-xs font-semibold transition flex flex-col items-center justify-center ${
                           isSlotActive
-                            ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                            : 'bg-[#141312] border-[#2D2B2A] text-[#9C968F] hover:text-[#F5F2EE]'
+                            ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                            : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                         }`}
                       >
                         <span className="text-[10px] opacity-75 tabular-nums">Beat {idx + 1}</span>
-                        <span className="font-serif-display text-sm font-bold text-[#F5F2EE] truncate max-w-full px-1">
+                        <span className="font-serif-display text-sm font-bold text-[var(--text-primary)] truncate max-w-full px-1">
                           {slotChord ? formatChordDisplay(slotChord) : '—'}
                         </span>
                       </button>
@@ -229,7 +232,7 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
               {/* CHORD DISPLAY & TYPE */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
+                  <span className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
                     {activeBeatSlot !== null ? `BEAT ${activeBeatSlot + 1} CHORD` : 'CHORD'}
                   </span>
                   <div className="flex items-center gap-2">
@@ -237,7 +240,7 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setActiveChord('-')}
-                        className="px-3 py-1 rounded-full bg-[#242220] border border-[#2D2B2A] text-xs text-[#9C968F] hover:text-[#F5F2EE]"
+                        className="px-3 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                       >
                         Clear (—)
                       </button>
@@ -247,8 +250,8 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                       onClick={() => setTypingMode((v) => !v)}
                       className={`px-3.5 py-1 rounded-full border text-xs font-medium transition ${
                         typingMode
-                          ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                          : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#F5F2EE]'
+                          ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                          : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)]'
                       }`}
                     >
                       {typingMode ? 'Done' : 'Type'}
@@ -263,11 +266,11 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                     value={activeChordValue === '-' ? '' : activeChordValue}
                     onChange={(e) => setActiveChord(e.target.value || '-')}
                     placeholder="Type chord e.g. G/B, F#m7"
-                    className="w-full h-14 px-4 rounded-2xl bg-[#141312] border border-[#E5A958] text-center font-serif-display text-2xl font-bold text-[#F5F2EE] focus:outline-none"
+                    className="w-full h-14 px-4 rounded-2xl bg-[var(--bg-recessed)] border border-[#E5A958] text-center font-serif-display text-2xl font-bold text-[var(--text-primary)] focus:outline-none"
                   />
                 ) : (
-                  <div className="w-full h-14 rounded-2xl bg-[#141312] border border-[#2D2B2A] flex items-center justify-center">
-                    <span className="font-serif-display text-[24px] font-bold text-[#F5F2EE]">
+                  <div className="w-full h-14 rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] flex items-center justify-center">
+                    <span className="font-serif-display text-[24px] font-bold text-[var(--text-primary)]">
                       {formatChordDisplay(activeChordValue)}
                     </span>
                   </div>
@@ -276,7 +279,7 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
 
               {/* COMMON */}
               <div>
-                <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase mb-2">
+                <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase mb-2">
                   COMMON
                 </p>
                 <div className="grid grid-cols-4 gap-2">
@@ -289,8 +292,8 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                         onClick={() => setActiveChord(c)}
                         className={`h-10 rounded-full border text-sm font-medium transition ${
                           active
-                            ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                            : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#F5F2EE] hover:bg-[#242220]'
+                            ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                            : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
                         }`}
                       >
                         {c}
@@ -302,7 +305,7 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
 
               {/* ROOT */}
               <div>
-                <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase mb-2">
+                <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase mb-2">
                   ROOT
                 </p>
                 <div className="grid grid-cols-6 gap-2">
@@ -315,8 +318,8 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                         onClick={() => handleSelectRoot(r)}
                         className={`h-9 rounded-full border text-sm font-medium transition ${
                           active
-                            ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                            : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#F5F2EE] hover:bg-[#242220]'
+                            ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                            : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
                         }`}
                       >
                         {r}
@@ -328,7 +331,7 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
 
               {/* TYPE */}
               <div>
-                <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase mb-2">
+                <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase mb-2">
                   TYPE
                 </p>
                 <div className="grid grid-cols-4 gap-2">
@@ -341,8 +344,8 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                         onClick={() => handleSelectType(t)}
                         className={`h-9 rounded-full border text-xs sm:text-sm font-medium transition ${
                           active
-                            ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                            : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#F5F2EE] hover:bg-[#242220]'
+                            ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                            : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
                         }`}
                       >
                         {t}
@@ -355,14 +358,14 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
               {/* BAR LYRICS INPUT */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
+                  <span className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
                     BAR LYRICS
                   </span>
                   {bar.lyrics && (
                     <button
                       type="button"
                       onClick={() => onUpdateBar({ ...bar, lyrics: undefined })}
-                      className="text-xs text-[#9C968F] hover:text-[#F5F2EE]"
+                      className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                     >
                       Clear
                     </button>
@@ -375,7 +378,7 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                     onUpdateBar({ ...bar, lyrics: e.target.value || undefined })
                   }
                   placeholder="Optional lyrics line for this bar (English / Sinhala)"
-                  className="w-full h-11 px-4 rounded-2xl bg-[#141312] border border-[#2D2B2A] font-sinhala text-sm text-[#F5F2EE] placeholder:text-[#78736D] focus:border-[#E5A958] focus:outline-none"
+                  className="w-full h-11 px-4 rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] font-sinhala text-sm text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[#E5A958] focus:outline-none"
                 />
               </div>
             </>
@@ -385,14 +388,14 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
               {/* VOICE CUE */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
+                  <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
                     VOICE CUE
                   </p>
                   {bar.cue && (
                     <button
                       type="button"
                       onClick={() => onUpdateBar({ ...bar, cue: undefined, customCueId: undefined })}
-                      className="text-xs text-[#9C968F] hover:text-[#F5F2EE]"
+                      className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                     >
                       Clear cue
                     </button>
@@ -410,7 +413,7 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                     })
                   }
                   placeholder="Select a studio voice cue or record/import your own"
-                  className="w-full h-12 px-4 rounded-2xl bg-[#141312] border border-[#2D2B2A] text-sm text-[#F5F2EE] placeholder:text-[#78736D] focus:border-[#E5A958] focus:outline-none"
+                  className="w-full h-12 px-4 rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[#E5A958] focus:outline-none"
                 />
 
                 <div className="flex flex-wrap gap-2">
@@ -430,8 +433,8 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                         }}
                         className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-xs font-medium transition ${
                           active
-                            ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                            : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#F5F2EE] hover:bg-[#242220]'
+                            ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                            : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
                         }`}
                       >
                         <Volume2 className="w-3 h-3 opacity-70" />
@@ -474,12 +477,12 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
               </div>
 
               {/* Voice count locked to this bar */}
-              <div className="rounded-2xl bg-[#141312] border border-[#2D2B2A] p-4 flex items-center justify-between gap-4">
+              <div className="rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] p-4 flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-[15px] font-medium text-[#F5F2EE]">
+                  <p className="text-[15px] font-medium text-[var(--text-primary)]">
                     Voice count locked to this bar
                   </p>
-                  <p className="text-xs text-[#9C968F] mt-1 leading-relaxed tabular-nums">
+                  <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed tabular-nums">
                     Counts this bar&apos;s {effectiveBeats} beats at {effectiveTempo} bpm · numbers restart at each group
                   </p>
                 </div>
@@ -491,11 +494,11 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                     onUpdateBar({ ...bar, voiceCountLocked: !bar.voiceCountLocked })
                   }
                   className={`w-12 h-7 rounded-full p-1 transition shrink-0 ${
-                    bar.voiceCountLocked ? 'bg-[#E5A958]' : 'bg-[#2D2B2A]'
+                    bar.voiceCountLocked ? 'bg-[#E5A958]' : 'bg-[var(--border-subtle)]'
                   }`}
                 >
                   <div
-                    className={`w-5 h-5 rounded-full bg-[#F5F2EE] transition-transform ${
+                    className={`w-5 h-5 rounded-full bg-[var(--switch-knob)] shadow-xs transition-transform ${
                       bar.voiceCountLocked ? 'translate-x-5' : 'translate-x-0'
                     }`}
                   />
@@ -504,10 +507,10 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
 
               {/* COUNTING SYSTEM */}
               <div>
-                <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
+                <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
                   COUNTING SYSTEM
                 </p>
-                <p className="text-xs text-[#9C968F] mt-1 mb-3 tabular-nums">
+                <p className="text-xs text-[var(--text-muted)] mt-1 mb-3 tabular-nums">
                   Spoken 1–7 MP3 count on each of this bar&apos;s {effectiveBeats} beats
                 </p>
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -520,8 +523,8 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                         onClick={() => onUpdateBar({ ...bar, countingSystem: pattern })}
                         className={`px-4 py-2 rounded-full border text-xs font-medium tracking-[0.2em] tabular-nums transition ${
                           active
-                            ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                            : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#F5F2EE]'
+                            ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                            : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)]'
                         }`}
                       >
                         {pattern}
@@ -536,17 +539,17 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                     onUpdateBar({ ...bar, countingSystem: e.target.value || undefined })
                   }
                   placeholder="Custom sequence (1–7), e.g. 1 2 3 4 5 6"
-                  className="w-full h-11 px-4 rounded-2xl bg-[#141312] border border-[#2D2B2A] text-sm text-[#F5F2EE] placeholder:text-[#78736D] focus:border-[#E5A958] focus:outline-none"
+                  className="w-full h-11 px-4 rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[#E5A958] focus:outline-none"
                 />
               </div>
 
               {/* BAR METER */}
               <div>
                 <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
+                  <span className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
                     BAR METER
                   </span>
-                  <span className="text-xs text-[#9C968F] tabular-nums">
+                  <span className="text-xs text-[var(--text-muted)] tabular-nums">
                     {bar.meter ? `${effectiveBeats} beats` : 'Follows the song'}
                   </span>
                 </div>
@@ -565,8 +568,8 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                         }
                         className={`h-10 rounded-full border text-sm font-medium tabular-nums transition ${
                           active
-                            ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                            : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#F5F2EE] hover:bg-[#242220]'
+                            ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                            : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
                         }`}
                       >
                         {m}
@@ -580,10 +583,10 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
               <div>
                 <div className="flex items-center justify-between gap-4 mb-3">
                   <div>
-                    <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
+                    <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
                       BAR TEMPO
                     </p>
-                    <p className="text-xs text-[#9C968F] mt-1 tabular-nums">
+                    <p className="text-xs text-[var(--text-muted)] mt-1 tabular-nums">
                       Overrides this bar only · section is {songBpm}
                     </p>
                   </div>
@@ -592,7 +595,7 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                       <button
                         type="button"
                         onClick={() => onUpdateBar({ ...bar, tempo: undefined })}
-                        className="text-xs text-[#E5A958] underline"
+                        className="text-xs text-[var(--accent-amber-text)] underline"
                       >
                         Reset
                       </button>
@@ -608,7 +611,7 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                           tempo: Math.max(20, Math.min(300, Number(e.target.value) || songBpm)),
                         })
                       }
-                      className="w-20 h-11 rounded-2xl bg-[#141312] border border-[#2D2B2A] text-center font-serif-display text-lg font-bold text-[#F5F2EE] tabular-nums focus:border-[#E5A958] focus:outline-none"
+                      className="w-20 h-11 rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-center font-serif-display text-lg font-bold text-[var(--text-primary)] tabular-nums focus:border-[#E5A958] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -624,7 +627,7 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
 
               {/* BEAT UNIT */}
               <div>
-                <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase mb-2.5">
+                <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase mb-2.5">
                   BEAT UNIT
                 </p>
                 <div className="grid grid-cols-4 gap-2">
@@ -637,8 +640,8 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                         onClick={() => onUpdateBar({ ...bar, beatUnit: unit })}
                         className={`h-10 rounded-full border text-xs sm:text-sm font-medium transition ${
                           active
-                            ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                            : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#F5F2EE] hover:bg-[#242220]'
+                            ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                            : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
                         }`}
                       >
                         {unit}
@@ -651,22 +654,22 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
               {/* Repeat this bar */}
               <div className="flex items-center justify-between gap-4 pt-1">
                 <div>
-                  <p className="text-[15px] font-medium text-[#F5F2EE]">Repeat this bar</p>
-                  <p className="text-xs text-[#9C968F] mt-0.5 tabular-nums">
+                  <p className="text-[15px] font-medium text-[var(--text-primary)]">Repeat this bar</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5 tabular-nums">
                     Plays it ×{repeatCount} in a row, live and in the export
                   </p>
                 </div>
-                <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-[#141312] border border-[#2D2B2A]">
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-[var(--bg-recessed)] border border-[var(--border-subtle)]">
                   <button
                     type="button"
                     onClick={() =>
                       onUpdateBar({ ...bar, repeat: Math.max(1, repeatCount - 1) })
                     }
-                    className="w-7 h-7 rounded-full hover:bg-[#242220] text-[#9C968F] hover:text-[#F5F2EE] flex items-center justify-center text-lg"
+                    className="w-7 h-7 rounded-full hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center text-lg"
                   >
                     −
                   </button>
-                  <span className="text-sm font-semibold text-[#F5F2EE] tabular-nums min-w-[24px] text-center">
+                  <span className="text-sm font-semibold text-[var(--text-primary)] tabular-nums min-w-[24px] text-center">
                     ×{repeatCount}
                   </span>
                   <button
@@ -674,7 +677,7 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                     onClick={() =>
                       onUpdateBar({ ...bar, repeat: Math.min(16, repeatCount + 1) })
                     }
-                    className="w-7 h-7 rounded-full hover:bg-[#242220] text-[#9C968F] hover:text-[#F5F2EE] flex items-center justify-center text-lg"
+                    className="w-7 h-7 rounded-full hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center text-lg"
                   >
                     +
                   </button>
@@ -685,7 +688,12 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
               <button
                 type="button"
                 onClick={onRemoveBar}
-                className="w-full h-12 rounded-full bg-[#241617] hover:bg-[#2F1B1C] border border-[#6E2D30] text-[#E68A8D] font-semibold text-sm flex items-center justify-center gap-2 transition"
+                style={{
+                  backgroundColor: 'var(--danger-bg)',
+                  borderColor: 'var(--danger-border)',
+                  color: 'var(--danger-text)',
+                }}
+                className="w-full h-12 rounded-full border font-semibold text-sm flex items-center justify-center gap-2 transition hover:opacity-90"
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Remove this bar</span>

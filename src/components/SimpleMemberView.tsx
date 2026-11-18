@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { EyeOff } from 'lucide-react';
+import { EyeOff, Moon, Sun } from 'lucide-react';
 import type { RoomSyncState, Song } from '../types';
 import type { SyncConnectionStatus } from '../hooks/useRoomSync';
 import { useWakeLock } from '../hooks/useWakeLock';
@@ -9,6 +9,13 @@ import {
   hasBeatSplits,
   transposeKey,
 } from '../utils/chords';
+import {
+  MEMBER_THEME_KEY,
+  applyDocumentTheme,
+  loadThemePreference,
+  saveThemePreference,
+  type ThemeMode,
+} from '../utils/theme';
 import { PWAInstallButton } from './PWAInstallButton';
 
 interface SimpleMemberViewProps {
@@ -32,6 +39,19 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
 }) => {
   const [tab, setTab] = useState<'chords' | 'lyrics'>('chords');
   const [tickBarIndex, setTickBarIndex] = useState<number>(0);
+  const [memberTheme, setMemberTheme] = useState<ThemeMode>(() =>
+    loadThemePreference(MEMBER_THEME_KEY)
+  );
+
+  // Persist & apply independent Band Member theme on this device
+  useEffect(() => {
+    saveThemePreference(MEMBER_THEME_KEY, memberTheme);
+    applyDocumentTheme(memberTheme);
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) {
+      themeMeta.setAttribute('content', memberTheme === 'light' ? '#F8F9FA' : '#121212');
+    }
+  }, [memberTheme]);
 
   // Keep Band Member's screen awake on stage
   const wakeLockActive = useWakeLock(true);
@@ -124,37 +144,56 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
   let runningBarNum = 0;
 
   return (
-    <div className="min-h-screen bg-[#121212] text-[#F5F2EE] pb-16">
+    <div className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] pb-16 transition-colors">
       {/* Minimal Read-Only Member Header */}
-      <header className="sticky top-0 z-30 bg-[#161514]/95 backdrop-blur-md border-b border-[#2D2B2A] px-4 py-3">
-        <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
+      <header
+        style={{ backgroundColor: 'var(--bg-header-sticky)' }}
+        className="sticky top-0 z-30 backdrop-blur-md border-b border-[var(--border-subtle)] px-3 sm:px-4 py-3"
+      >
+        <div className="max-w-3xl mx-auto flex items-center justify-between gap-2 sm:gap-3">
           {/* Left: LIVE SYNCED badge */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1C1B1A] border border-[#2D2B2A] shrink-0">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] shrink-0">
             <span
               className={`w-2 h-2 rounded-full ${
                 syncStatus === 'connected'
-                  ? 'bg-emerald-400'
+                  ? 'bg-emerald-500'
                   : syncStatus === 'connecting'
                   ? 'bg-[#E5A958]'
-                  : 'bg-red-400'
+                  : 'bg-red-500'
               }`}
             />
-            <span className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#F5F2EE] whitespace-nowrap">
+            <span className="text-[10px] font-bold tracking-[0.12em] uppercase text-[var(--text-primary)] whitespace-nowrap">
               {syncStatus === 'connected' ? 'LIVE SYNCED' : `ROOM ${roomId}`}
             </span>
           </div>
 
           {/* Center: Song Title & Artist */}
           <div className="text-center min-w-0 flex-1">
-            <h1 className="font-serif-display text-[17px] font-bold text-[#F5F2EE] truncate leading-tight">
+            <h1 className="font-serif-display text-[16px] sm:text-[17px] font-bold text-[var(--text-primary)] truncate leading-tight">
               {activeSong.title}
             </h1>
-            <p className="text-[11px] text-[#9C968F] truncate">{activeSong.artist}</p>
+            <p className="text-[11px] text-[var(--text-muted)] truncate">{activeSong.artist}</p>
           </div>
 
-          {/* Right: Current Key + BPM pill */}
-          <div className="px-3 py-1 rounded-full bg-[#252019] border border-[#E5A958]/50 text-[#E5A958] text-xs font-bold tabular-nums whitespace-nowrap shrink-0">
-            {displayKey} · {effectiveBpm} bpm
+          {/* Right: Current Key + BPM pill + Independent Theme Toggle */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="px-2.5 sm:px-3 py-1 rounded-full bg-[var(--accent-amber-tint)] border border-[#E5A958]/60 text-[var(--accent-amber-text)] text-xs font-bold tabular-nums whitespace-nowrap">
+              {displayKey} · {effectiveBpm} bpm
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setMemberTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+              aria-label={memberTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              title={memberTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              className="w-8 h-8 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center justify-center transition active:scale-95"
+            >
+              {memberTheme === 'dark' ? (
+                <Sun className="w-4 h-4 text-[#E5A958]" />
+              ) : (
+                <Moon className="w-4 h-4 text-[#6E7BF2]" />
+              )}
+            </button>
           </div>
         </div>
       </header>
@@ -164,14 +203,14 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
         <PWAInstallButton appName="Chordbook Stage" variant="banner" />
 
         {/* Clean Segmented Toggle: CHORDS | LYRICS */}
-        <div className="p-1 rounded-full bg-[#181716] border border-[#2D2B2A] grid grid-cols-2">
+        <div className="p-1 rounded-full bg-[var(--bg-panel)] border border-[var(--border-subtle)] grid grid-cols-2 shadow-xs">
           <button
             type="button"
             onClick={() => setTab('chords')}
             className={`py-2.5 rounded-full text-[13px] font-bold tracking-[0.16em] uppercase transition ${
               tab === 'chords'
                 ? 'bg-[#E5A958] text-[#121212]'
-                : 'text-[#9C968F] hover:text-[#F5F2EE]'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
             }`}
           >
             CHORDS
@@ -182,7 +221,7 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
             className={`py-2.5 rounded-full text-[13px] font-bold tracking-[0.16em] uppercase transition ${
               tab === 'lyrics'
                 ? 'bg-[#E5A958] text-[#121212]'
-                : 'text-[#9C968F] hover:text-[#F5F2EE]'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
             }`}
           >
             LYRICS
@@ -193,7 +232,8 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
         {tab === 'chords' ? (
           <div className="space-y-4">
             {activeSong.sections.map((section) => {
-              const secTranspose = globalTranspose + (sectionTransposes[section.id] ?? section.transpose ?? 0);
+              const secTranspose =
+                globalTranspose + (sectionTransposes[section.id] ?? section.transpose ?? 0);
               const isSectionPlaying = isPlaying && activeSectionId === section.id;
 
               return (
@@ -201,19 +241,21 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
                   key={section.id}
                   className={`rounded-3xl border p-4 sm:p-5 transition ${
                     isSectionPlaying
-                      ? 'bg-[#1D1B18] border-[#E5A958]/50'
-                      : 'bg-[#181716] border-[#2D2B2A]'
+                      ? 'bg-[var(--accent-amber-tint)]/55 border-[#E5A958]/60'
+                      : 'bg-[var(--bg-panel)] border-[var(--border-subtle)] shadow-xs'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <h2
                       className={`font-serif-display text-[22px] font-bold ${
-                        isSectionPlaying ? 'text-[#E5A958]' : 'text-[#F5F2EE]'
+                        isSectionPlaying
+                          ? 'text-[var(--accent-amber-text)]'
+                          : 'text-[var(--text-primary)]'
                       }`}
                     >
                       {section.name}
                     </h2>
-                    <span className="text-xs text-[#9C968F] tabular-nums">
+                    <span className="text-xs text-[var(--text-muted)] tabular-nums">
                       {activeSong.timeSignature}
                     </span>
                   </div>
@@ -234,15 +276,15 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
                           ref={isActive ? activeBarRef : undefined}
                           className={`relative min-h-[88px] rounded-2xl border p-2 flex flex-col items-center justify-center text-center transition ${
                             isActive
-                              ? 'bg-[#2E2416] border-[#E5A958] ring-2 ring-[#E5A958]/50 scale-[1.02]'
-                              : 'bg-[#121212] border-[#2D2B2A]'
+                              ? 'bg-[var(--accent-amber-active-bar)] border-[#E5A958] ring-2 ring-[#E5A958]/50 scale-[1.02]'
+                              : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)]'
                           }`}
                         >
-                          <span className="absolute top-2 left-2.5 text-[11px] text-[#78736D] tabular-nums">
+                          <span className="absolute top-2 left-2.5 text-[11px] text-[var(--text-subtle)] tabular-nums">
                             {barNum}
                           </span>
                           {repeats > 1 && (
-                            <span className="absolute top-2 right-2 text-[10px] font-semibold text-[#E5A958] tabular-nums">
+                            <span className="absolute top-2 right-2 text-[10px] font-semibold text-[var(--accent-amber-text)] tabular-nums">
                               ×{repeats}
                             </span>
                           )}
@@ -250,18 +292,20 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
                             className={`font-serif-display ${
                               isSplit ? 'text-[16px] sm:text-[18px]' : 'text-[22px] sm:text-[26px]'
                             } font-bold max-w-full truncate ${
-                              isActive ? 'text-[#E5A958]' : 'text-[#F5F2EE]'
+                              isActive
+                                ? 'text-[var(--accent-amber-text)]'
+                                : 'text-[var(--text-primary)]'
                             }`}
                           >
                             {chordText}
                           </span>
                           {bar.lyrics && (
-                            <span className="text-[10px] font-sinhala text-[#9C968F] mt-1 truncate max-w-full">
+                            <span className="text-[10px] font-sinhala text-[var(--text-muted)] mt-1 truncate max-w-full">
                               {bar.lyrics}
                             </span>
                           )}
                           {bar.cue && (
-                            <span className="text-[10px] text-[#E5A958]/90 mt-0.5 truncate max-w-full">
+                            <span className="text-[10px] text-[var(--accent-amber-text)] mt-0.5 truncate max-w-full">
                               {bar.cue}
                             </span>
                           )}
@@ -274,7 +318,7 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
             })}
           </div>
         ) : (
-          <div className="rounded-3xl bg-[#181716] border border-[#2D2B2A] p-6 space-y-6">
+          <div className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-6 space-y-6 shadow-xs">
             {activeSong.lyrics.map((lyr) => {
               const currentSectionObj = activeSong.sections.find((s) => s.id === activeSectionId);
               const isHighlighted =
@@ -288,18 +332,20 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
                   ref={isHighlighted ? activeLyricRef : undefined}
                   className={`rounded-2xl transition ${
                     isHighlighted
-                      ? 'bg-[#252019] p-4 border border-[#E5A958]/50'
+                      ? 'bg-[var(--accent-amber-tint)] p-4 border border-[#E5A958]/50'
                       : ''
                   }`}
                 >
                   <h3
                     className={`text-[16px] font-semibold mb-2.5 ${
-                      isHighlighted ? 'text-[#E5A958]' : 'text-[#9C968F]'
+                      isHighlighted
+                        ? 'text-[var(--accent-amber-text)]'
+                        : 'text-[var(--text-muted)]'
                     }`}
                   >
                     {lyr.label}
                   </h3>
-                  <div className="font-sinhala space-y-2 text-[22px] sm:text-[24px] leading-[1.7] text-[#F5F2EE]">
+                  <div className="font-sinhala space-y-2 text-[22px] sm:text-[24px] leading-[1.7] text-[var(--text-primary)]">
                     {lyr.lines.map((line, i) => (
                       <p key={i}>{line}</p>
                     ))}
@@ -310,7 +356,7 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
           </div>
         )}
 
-        <p className="text-center text-[11px] text-[#78736D] pt-2">
+        <p className="text-center text-[11px] text-[var(--text-subtle)] pt-2">
           Chordbook Stage · Read-only live sync{wakeLockActive ? ' · Screen kept awake' : ''}
         </p>
       </div>

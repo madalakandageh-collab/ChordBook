@@ -72,7 +72,7 @@ export const LocalWifiScreen: React.FC<LocalWifiScreenProps> = ({
       margin: 2,
       color: {
         dark: '#121212',
-        light: '#F5F2EE',
+        light: '#FFFFFF',
       },
     })
       .then((url) => setQrDataUrl(url))
@@ -112,18 +112,18 @@ export const LocalWifiScreen: React.FC<LocalWifiScreenProps> = ({
           type="button"
           onClick={onBack}
           aria-label="Back to Your sheets"
-          className="w-10 h-10 rounded-full bg-[#1C1B1A] hover:bg-[#242220] border border-[#2D2B2A] text-[#F5F2EE] flex items-center justify-center transition"
+          className="w-10 h-10 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center justify-center transition shadow-xs"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
 
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#1C1B1A] border border-[#2D2B2A] text-xs font-medium">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs font-medium shadow-xs">
           <span
             className={`w-2 h-2 rounded-full ${
-              syncStatus === 'connected' ? 'bg-emerald-400' : 'bg-[#E5A958]'
+              syncStatus === 'connected' ? 'bg-emerald-500' : 'bg-[#E5A958]'
             }`}
           />
-          <span className="text-[#F5F2EE] tabular-nums">
+          <span className="text-[var(--text-primary)] tabular-nums">
             {syncStatus === 'connected'
               ? `Sync Hub Ready${rttMs !== null ? ` · ${rttMs}ms` : ''}`
               : 'Connecting sync hub...'}
@@ -132,37 +132,37 @@ export const LocalWifiScreen: React.FC<LocalWifiScreenProps> = ({
       </div>
 
       <div>
-        <p className="text-[11px] font-medium tracking-[0.24em] text-[#9C968F] uppercase">
+        <p className="text-[11px] font-medium tracking-[0.24em] text-[var(--text-muted)] uppercase">
           LOCAL WI-FI &amp; HOTSPOT SYNC
         </p>
-        <h1 className="font-serif-display text-[32px] leading-[1.1] font-bold text-[#F5F2EE] mt-1">
+        <h1 className="font-serif-display text-[32px] leading-[1.1] font-bold text-[var(--text-primary)] mt-1">
           Simple Band Member App
         </h1>
-        <p className="text-[14px] text-[#9C968F] mt-1.5">
+        <p className="text-[14px] text-[var(--text-muted)] mt-1.5">
           Share a stripped-down, read-only stage view to your bandmates over a Mobile Hotspot with instant bar &amp; key sync.
         </p>
       </div>
 
       {/* Step-by-step Hotspot Guide */}
-      <div className="rounded-3xl bg-[#181716] border border-[#2D2B2A] p-5 space-y-3">
-        <p className="text-[11px] font-medium tracking-[0.2em] text-[#E5A958] uppercase">
+      <div className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-5 space-y-3 shadow-xs">
+        <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--accent-amber-text)] uppercase">
           MOBILE HOTSPOT GUIDE
         </p>
-        <ol className="space-y-2.5 text-[14px] text-[#F5F2EE]">
+        <ol className="space-y-2.5 text-[14px] text-[var(--text-primary)]">
           <li className="flex items-start gap-3">
-            <span className="w-6 h-6 rounded-full bg-[#252019] border border-[#E5A958]/40 text-[#E5A958] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+            <span className="w-6 h-6 rounded-full bg-[var(--accent-amber-tint)] border border-[#E5A958]/50 text-[var(--accent-amber-text)] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
               1
             </span>
             <span>Turn on your Mobile Hotspot.</span>
           </li>
           <li className="flex items-start gap-3">
-            <span className="w-6 h-6 rounded-full bg-[#252019] border border-[#E5A958]/40 text-[#E5A958] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+            <span className="w-6 h-6 rounded-full bg-[var(--accent-amber-tint)] border border-[#E5A958]/50 text-[var(--accent-amber-text)] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
               2
             </span>
             <span>Band members connect to your Wi-Fi.</span>
           </li>
           <li className="flex items-start gap-3">
-            <span className="w-6 h-6 rounded-full bg-[#252019] border border-[#E5A958]/40 text-[#E5A958] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+            <span className="w-6 h-6 rounded-full bg-[var(--accent-amber-tint)] border border-[#E5A958]/50 text-[var(--accent-amber-text)] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
               3
             </span>
             <span>Scan the QR code or tap &lsquo;Share / Send Simple App&rsquo; below.</span>
@@ -171,9 +171,9 @@ export const LocalWifiScreen: React.FC<LocalWifiScreenProps> = ({
       </div>
 
       {/* QR Code & Link Share Card */}
-      <div className="rounded-3xl bg-[#181716] border border-[#2D2B2A] p-5 grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6 items-center">
+      <div className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-5 grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6 items-center shadow-xs">
         <div className="flex flex-col items-center">
-          <div className="p-3 rounded-2xl bg-[#F5F2EE] shadow-lg">
+          <div className="p-3 rounded-2xl bg-white border border-[var(--border-subtle)] shadow-md">
             {qrDataUrl ? (
               <img
                 src={qrDataUrl}
@@ -181,10 +181,10 @@ export const LocalWifiScreen: React.FC<LocalWifiScreenProps> = ({
                 className="w-44 h-44 block"
               />
             ) : (
-              <div className="w-44 h-44 bg-[#2D2B2A] animate-pulse rounded-xl" />
+              <div className="w-44 h-44 bg-[var(--border-subtle)] animate-pulse rounded-xl" />
             )}
           </div>
-          <span className="text-[11px] tracking-[0.2em] text-[#9C968F] uppercase mt-2.5 tabular-nums">
+          <span className="text-[11px] tracking-[0.2em] text-[var(--text-muted)] uppercase mt-2.5 tabular-nums">
             ROOM {roomId}
           </span>
         </div>
@@ -193,7 +193,7 @@ export const LocalWifiScreen: React.FC<LocalWifiScreenProps> = ({
           {/* Room Code & Host Selector */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] tracking-[0.18em] text-[#9C968F] uppercase mb-1.5">
+              <label className="block text-[11px] tracking-[0.18em] text-[var(--text-muted)] uppercase mb-1.5">
                 Room Code
               </label>
               <input
@@ -201,18 +201,18 @@ export const LocalWifiScreen: React.FC<LocalWifiScreenProps> = ({
                 maxLength={8}
                 value={roomId}
                 onChange={(e) => onChangeRoomId(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-                className="w-full h-10 px-3 rounded-xl bg-[#141312] border border-[#2D2B2A] text-sm font-semibold tracking-widest text-[#E5A958] tabular-nums focus:border-[#E5A958] focus:outline-none"
+                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-sm font-semibold tracking-widest text-[var(--accent-amber-text)] tabular-nums focus:border-[#E5A958] focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] tracking-[0.18em] text-[#9C968F] uppercase mb-1.5">
+              <label className="block text-[11px] tracking-[0.18em] text-[var(--text-muted)] uppercase mb-1.5">
                 Network Address
               </label>
               <select
                 value={selectedHost}
                 onChange={(e) => setSelectedHost(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl bg-[#141312] border border-[#2D2B2A] text-xs text-[#F5F2EE] focus:border-[#E5A958] focus:outline-none"
+                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:border-[#E5A958] focus:outline-none"
               >
                 <option value={window.location.origin}>
                   Current URL ({window.location.host})
@@ -231,20 +231,20 @@ export const LocalWifiScreen: React.FC<LocalWifiScreenProps> = ({
 
           {/* Copyable Direct Member URL */}
           <div>
-            <label className="block text-[11px] tracking-[0.18em] text-[#9C968F] uppercase mb-1.5">
+            <label className="block text-[11px] tracking-[0.18em] text-[var(--text-muted)] uppercase mb-1.5">
               Band Member Direct Link
             </label>
             <div className="flex items-center gap-2">
-              <div className="flex-1 h-10 px-3 rounded-xl bg-[#141312] border border-[#2D2B2A] flex items-center text-xs text-[#9C968F] truncate select-all">
+              <div className="flex-1 h-10 px-3 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] flex items-center text-xs text-[var(--text-muted)] truncate select-all">
                 {memberUrl}
               </div>
               <button
                 type="button"
                 onClick={handleCopyLink}
                 aria-label="Copy member link"
-                className="w-10 h-10 rounded-xl bg-[#242220] hover:bg-[#2D2B2A] border border-[#2D2B2A] text-[#F5F2EE] flex items-center justify-center shrink-0"
+                className="w-10 h-10 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center justify-center shrink-0"
               >
-                {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
               </button>
             </div>
           </div>
@@ -263,7 +263,7 @@ export const LocalWifiScreen: React.FC<LocalWifiScreenProps> = ({
             <button
               type="button"
               onClick={onPreviewMemberApp}
-              className="flex-1 h-11 px-4 rounded-full bg-[#242220] hover:bg-[#2D2B2A] border border-[#E5A958]/40 text-[#E5A958] font-semibold text-sm flex items-center justify-center gap-2 transition"
+              className="flex-1 h-11 px-4 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border border-[#E5A958]/50 text-[var(--accent-amber-text)] font-semibold text-sm flex items-center justify-center gap-2 transition"
             >
               <Eye className="w-4 h-4" />
               <span>Preview Member App</span>
@@ -273,22 +273,22 @@ export const LocalWifiScreen: React.FC<LocalWifiScreenProps> = ({
       </div>
 
       {/* Connected Members List */}
-      <div className="rounded-3xl bg-[#181716] border border-[#2D2B2A] p-5 space-y-3">
+      <div className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-5 space-y-3 shadow-xs">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-[#E5A958]" />
-            <h2 className="font-serif-display text-lg font-bold text-[#F5F2EE]">
+            <Users className="w-4 h-4 text-[var(--accent-amber-text)]" />
+            <h2 className="font-serif-display text-lg font-bold text-[var(--text-primary)]">
               Connected Band Members
             </h2>
           </div>
-          <span className="text-xs text-[#9C968F] tabular-nums">
+          <span className="text-xs text-[var(--text-muted)] tabular-nums">
             {presence.memberCount} online
           </span>
         </div>
 
         {presence.members.filter((m) => m.role === 'member').length === 0 ? (
-          <div className="rounded-2xl bg-[#141312] border border-[#2D2B2A] p-4 flex items-center gap-3 text-sm text-[#9C968F]">
-            <Wifi className="w-4 h-4 text-[#78736D] shrink-0" />
+          <div className="rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] p-4 flex items-center gap-3 text-sm text-[var(--text-muted)]">
+            <Wifi className="w-4 h-4 text-[var(--text-subtle)] shrink-0" />
             <span>
               No band members connected yet. Have them scan the QR code or open the link above on their phone.
             </span>
@@ -300,18 +300,18 @@ export const LocalWifiScreen: React.FC<LocalWifiScreenProps> = ({
               .map((member, idx) => (
                 <div
                   key={member.clientId}
-                  className="rounded-2xl bg-[#141312] border border-[#2D2B2A] px-4 py-3 flex items-center justify-between"
+                  className="rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] px-4 py-3 flex items-center justify-between"
                 >
                   <div className="flex items-center gap-3">
-                    <Smartphone className="w-4 h-4 text-[#E5A958]" />
+                    <Smartphone className="w-4 h-4 text-[var(--accent-amber-text)]" />
                     <div>
-                      <p className="text-sm font-medium text-[#F5F2EE]">
+                      <p className="text-sm font-medium text-[var(--text-primary)]">
                         {member.deviceName || `Band Member ${idx + 1}`}
                       </p>
-                      <p className="text-xs text-[#9C968F]">Read-only Chordbook Stage</p>
+                      <p className="text-xs text-[var(--text-muted)]">Read-only Chordbook Stage</p>
                     </div>
                   </div>
-                  <span className="text-xs font-medium text-emerald-400">Synced</span>
+                  <span className="text-xs font-medium text-emerald-500">Synced</span>
                 </div>
               ))}
           </div>

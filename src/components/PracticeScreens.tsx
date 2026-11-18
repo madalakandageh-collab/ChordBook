@@ -20,19 +20,19 @@ export const PracticeSelectScreen: React.FC<PracticeSelectScreenProps> = ({
         type="button"
         onClick={onBack}
         aria-label="Back to Your sheets"
-        className="w-10 h-10 rounded-full bg-[#1C1B1A] hover:bg-[#242220] border border-[#2D2B2A] text-[#F5F2EE] flex items-center justify-center transition"
+        className="w-10 h-10 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center justify-center transition shadow-xs"
       >
         <ArrowLeft className="w-4 h-4" />
       </button>
 
       <div className="mt-4">
-        <p className="text-[11px] font-medium tracking-[0.24em] text-[#9C968F] uppercase">
+        <p className="text-[11px] font-medium tracking-[0.24em] text-[var(--text-muted)] uppercase">
           PRACTICE
         </p>
-        <h1 className="font-serif-display text-[36px] leading-[1.1] font-bold text-[#F5F2EE] mt-1">
+        <h1 className="font-serif-display text-[36px] leading-[1.1] font-bold text-[var(--text-primary)] mt-1">
           Rehearse
         </h1>
-        <p className="text-[14px] text-[#9C968F] mt-1.5">
+        <p className="text-[14px] text-[var(--text-muted)] mt-1.5">
           Slow it down, loop a section and count yourself in.
         </p>
       </div>
@@ -45,22 +45,22 @@ export const PracticeSelectScreen: React.FC<PracticeSelectScreenProps> = ({
               key={song.id}
               type="button"
               onClick={() => onSelectSong(song.id)}
-              className="w-full flex items-center justify-between gap-3.5 p-4 rounded-2xl bg-[#1C1B1A] hover:bg-[#22201E] active:scale-[0.99] border border-[#2D2B2A] text-left transition"
+              className="w-full flex items-center justify-between gap-3.5 p-4 rounded-2xl bg-[var(--bg-surface)] hover:bg-[var(--bg-hover)] active:scale-[0.99] border border-[var(--border-subtle)] text-left transition shadow-xs"
             >
               <div className="flex items-center gap-3.5 min-w-0">
-                <div className="w-11 h-11 rounded-full bg-[#2B2318] border border-[#E5A958]/20 text-[#E5A958] font-bold text-[15px] flex items-center justify-center shrink-0">
+                <div className="w-11 h-11 rounded-full bg-[var(--accent-amber-tint-strong)] border border-[#E5A958]/30 text-[var(--accent-amber-text)] font-bold text-[15px] flex items-center justify-center shrink-0">
                   {displayKey}
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-[16px] font-medium text-[#F5F2EE] truncate">
+                  <h2 className="text-[16px] font-medium text-[var(--text-primary)] truncate">
                     {song.title}
                   </h2>
-                  <p className="text-[13px] text-[#9C968F] mt-0.5 tabular-nums">
+                  <p className="text-[13px] text-[var(--text-muted)] mt-0.5 tabular-nums">
                     {song.bpm} bpm · {song.timeSignature}
                   </p>
                 </div>
               </div>
-              <Target className="w-5 h-5 text-[#E5A958] shrink-0" />
+              <Target className="w-5 h-5 text-[var(--accent-amber-text)] shrink-0" />
             </button>
           );
         })}
@@ -131,19 +131,19 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
   });
 
   return (
-    <div className="min-h-screen bg-[#121212] pb-32">
-      {/* Custom Practice Header (no blue bar, matching screenshot) */}
+    <div className="min-h-screen bg-[var(--bg-canvas)] pb-32 transition-colors">
+      {/* Custom Practice Header (no blue bar) */}
       <div className="max-w-2xl mx-auto px-4 pt-4 flex items-center justify-between">
         <button
           type="button"
           onClick={onBack}
           aria-label="Back to Rehearse song list"
-          className="w-10 h-10 rounded-full bg-[#1C1B1A] hover:bg-[#242220] border border-[#2D2B2A] text-[#F5F2EE] flex items-center justify-center transition"
+          className="w-10 h-10 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center justify-center transition shadow-xs"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
 
-        <span className="text-[11px] font-medium tracking-[0.26em] text-[#9C968F] uppercase">
+        <span className="text-[11px] font-medium tracking-[0.26em] text-[var(--text-muted)] uppercase">
           PRACTICE · THIS PHONE
         </span>
 
@@ -154,7 +154,7 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
           className={`w-10 h-10 rounded-full flex items-center justify-center transition ${
             isLocked
               ? 'bg-[#E5A958] text-[#121212]'
-              : 'bg-[#252019] border border-[#E5A958] text-[#E5A958]'
+              : 'bg-[var(--accent-amber-tint)] border border-[#E5A958] text-[var(--accent-amber-text)]'
           }`}
         >
           {isLocked ? <Lock className="w-4 h-4" /> : <LockOpen className="w-4 h-4" />}
@@ -164,45 +164,45 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
       <div className="max-w-2xl mx-auto px-4 mt-5 space-y-4">
         {/* Song Title & Current Section */}
         <div className="text-center">
-          <p className="text-[11px] font-medium tracking-[0.28em] text-[#9C968F] uppercase">
+          <p className="text-[11px] font-medium tracking-[0.28em] text-[var(--text-muted)] uppercase">
             {song.title}
           </p>
-          <h1 className="font-serif-display text-[22px] font-semibold text-[#E5A958] mt-1">
+          <h1 className="font-serif-display text-[22px] font-semibold text-[var(--accent-amber-text)] mt-1">
             {currentStep?.sectionName || song.sections[0]?.name || 'Start'}
           </h1>
         </div>
 
         {/* KEY Bar */}
-        <div className="rounded-2xl bg-[#181716] border border-[#2D2B2A] px-4 py-2.5 flex items-center justify-between">
+        <div className="rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] px-4 py-2.5 flex items-center justify-between shadow-xs">
           <div className="flex items-baseline gap-2.5">
-            <span className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
+            <span className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
               KEY
             </span>
-            <span className="font-serif-display text-[22px] font-bold text-[#F5F2EE]">
+            <span className="font-serif-display text-[22px] font-bold text-[var(--text-primary)]">
               {displayKey}
             </span>
           </div>
 
           <div className="flex items-center gap-2.5">
-            <span className="text-[11px] tracking-[0.18em] text-[#9C968F] uppercase">
+            <span className="text-[11px] tracking-[0.18em] text-[var(--text-muted)] uppercase">
               ALL
             </span>
             <button
               type="button"
               disabled={isLocked}
               onClick={() => onTransposeAll(-1)}
-              className="w-8 h-8 rounded-full bg-[#242220] hover:bg-[#2D2B2A] disabled:opacity-40 border border-[#2D2B2A] text-[#F5F2EE] flex items-center justify-center"
+              className="w-8 h-8 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] disabled:opacity-40 border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center justify-center"
             >
               −
             </button>
-            <span className="w-5 text-center text-sm font-semibold text-[#F5F2EE] tabular-nums">
+            <span className="w-5 text-center text-sm font-semibold text-[var(--text-primary)] tabular-nums">
               {song.transpose > 0 ? `+${song.transpose}` : song.transpose}
             </span>
             <button
               type="button"
               disabled={isLocked}
               onClick={() => onTransposeAll(1)}
-              className="w-8 h-8 rounded-full bg-[#242220] hover:bg-[#2D2B2A] disabled:opacity-40 border border-[#2D2B2A] text-[#F5F2EE] flex items-center justify-center"
+              className="w-8 h-8 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] disabled:opacity-40 border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center justify-center"
             >
               +
             </button>
@@ -210,21 +210,21 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
         </div>
 
         {/* Main Active Chord Display */}
-        <div className="rounded-3xl bg-[#161514] border border-[#2D2B2A] py-12 px-6 flex flex-col items-center justify-center text-center min-h-[205px]">
-          <div className="font-serif-display text-[48px] sm:text-[56px] leading-none font-bold text-[#F5F2EE]">
+        <div className="rounded-3xl bg-[var(--bg-stage)] border border-[var(--border-subtle)] py-12 px-6 flex flex-col items-center justify-center text-center min-h-[205px] shadow-xs">
+          <div className="font-serif-display text-[48px] sm:text-[56px] leading-none font-bold text-[var(--text-primary)]">
             {currentChordDisplay}
           </div>
           {currentStep?.bar.lyrics && (
-            <div className="mt-2 font-sinhala text-sm text-[#F5F2EE]/85">
+            <div className="mt-2 font-sinhala text-sm text-[var(--text-primary)]/85">
               {currentStep.bar.lyrics}
             </div>
           )}
           {currentStep?.bar.cue && (
-            <div className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-[#E5A958]">
+            <div className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-[var(--accent-amber-text)]">
               Cue: {currentStep.bar.cue}
             </div>
           )}
-          <p className="mt-5 text-[13px] text-[#9C968F] tabular-nums">
+          <p className="mt-5 text-[13px] text-[var(--text-muted)] tabular-nums">
             Bar {currentStep?.displayBarNumber || 1} of {totalBars} · {effectiveBpm} bpm ·{' '}
             {currentStep?.effectiveMeter || song.timeSignature}
           </p>
@@ -236,7 +236,7 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
                   className={`w-2 h-2 rounded-full transition-transform ${
                     currentBeat === i + 1
                       ? 'bg-[#E5A958] scale-125'
-                      : 'bg-[#2D2B2A]'
+                      : 'bg-[var(--border-subtle)]'
                   }`}
                 />
               ))}
@@ -252,10 +252,10 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
               type="button"
               disabled={!item}
               onClick={() => item && onSeekToBarIndex(item.idx)}
-              className={`h-14 rounded-2xl border flex items-center justify-center font-serif-display text-[20px] font-semibold transition ${
+              className={`h-14 rounded-2xl border flex items-center justify-center font-serif-display text-[20px] font-semibold transition shadow-xs ${
                 item?.isCurrent
-                  ? 'bg-[#211C15] border-[#E5A958] text-[#F5F2EE]'
-                  : 'bg-[#161514] border-[#2D2B2A] text-[#F5F2EE]/85 hover:bg-[#1C1B1A]'
+                  ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--text-primary)]'
+                  : 'bg-[var(--bg-stage)] border-[var(--border-subtle)] text-[var(--text-primary)]/85 hover:bg-[var(--bg-elevated)]'
               }`}
             >
               {item ? item.chord : ''}
@@ -264,8 +264,8 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
         </div>
 
         {/* SPEED Card */}
-        <div className="rounded-3xl bg-[#181716] border border-[#2D2B2A] p-4 space-y-3">
-          <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
+        <div className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-4 space-y-3 shadow-xs">
+          <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
             SPEED
           </p>
           <div className="grid grid-cols-3 gap-2.5">
@@ -279,8 +279,8 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
                   onClick={() => onSpeedChange(pct)}
                   className={`h-11 rounded-2xl border text-sm font-semibold tabular-nums transition ${
                     active
-                      ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                      : 'bg-[#141312] border-[#2D2B2A] text-[#F5F2EE]/80 hover:text-[#F5F2EE]'
+                      ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                      : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-primary)]/80 hover:text-[var(--text-primary)]'
                   } disabled:opacity-50`}
                 >
                   {pct}%
@@ -288,14 +288,14 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
               );
             })}
           </div>
-          <p className="text-xs text-[#9C968F] leading-relaxed tabular-nums">
+          <p className="text-xs text-[var(--text-muted)] leading-relaxed tabular-nums">
             {effectiveBpm} bpm · clicks and spoken counts keep their natural pitch
           </p>
         </div>
 
         {/* LOOP Card */}
-        <div className="rounded-3xl bg-[#181716] border border-[#2D2B2A] p-4 space-y-3">
-          <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase">
+        <div className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-4 space-y-3 shadow-xs">
+          <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
             LOOP
           </p>
           <div className="flex flex-wrap gap-2">
@@ -304,8 +304,8 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
               onClick={() => onLoopSectionChange(null)}
               className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-xs font-semibold transition ${
                 loopSectionId === null
-                  ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                  : 'bg-[#141312] border-[#2D2B2A] text-[#F5F2EE]/85 hover:text-[#F5F2EE]'
+                  ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-primary)]/85 hover:text-[var(--text-primary)]'
               }`}
             >
               <Repeat className="w-3.5 h-3.5" />
@@ -320,8 +320,8 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
                   onClick={() => onLoopSectionChange(sec.id)}
                   className={`px-3.5 py-2 rounded-full border text-xs font-medium transition ${
                     active
-                      ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                      : 'bg-[#141312] border-[#2D2B2A] text-[#F5F2EE]/85 hover:text-[#F5F2EE]'
+                      ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                      : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-primary)]/85 hover:text-[var(--text-primary)]'
                   }`}
                 >
                   {sec.name}
@@ -332,8 +332,8 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
         </div>
 
         {/* SECTION KEYS Card */}
-        <div className="rounded-3xl bg-[#181716] border border-[#2D2B2A] p-4 space-y-2.5">
-          <p className="text-[11px] font-medium tracking-[0.2em] text-[#9C968F] uppercase mb-1">
+        <div className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-4 space-y-2.5 shadow-xs">
+          <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase mb-1">
             SECTION KEYS
           </p>
           {song.sections.map((sec) => {
@@ -341,26 +341,26 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
             return (
               <div
                 key={sec.id}
-                className="rounded-2xl bg-[#141312] border border-[#2D2B2A] px-4 py-2.5 flex items-center justify-between"
+                className="rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] px-4 py-2.5 flex items-center justify-between"
               >
-                <span className="text-sm font-medium text-[#F5F2EE]">{sec.name}</span>
+                <span className="text-sm font-medium text-[var(--text-primary)]">{sec.name}</span>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
                     disabled={isLocked}
                     onClick={() => onSectionTransposeChange(sec.id, -1)}
-                    className="w-8 h-8 rounded-full bg-[#1C1B1A] hover:bg-[#242220] disabled:opacity-40 border border-[#2D2B2A] text-[#9C968F] hover:text-[#F5F2EE] flex items-center justify-center"
+                    className="w-8 h-8 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] disabled:opacity-40 border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center"
                   >
                     −
                   </button>
-                  <span className="w-5 text-center text-sm font-semibold text-[#F5F2EE] tabular-nums">
+                  <span className="w-5 text-center text-sm font-semibold text-[var(--text-primary)] tabular-nums">
                     {val > 0 ? `+${val}` : val}
                   </span>
                   <button
                     type="button"
                     disabled={isLocked}
                     onClick={() => onSectionTransposeChange(sec.id, 1)}
-                    className="w-8 h-8 rounded-full bg-[#1C1B1A] hover:bg-[#242220] disabled:opacity-40 border border-[#2D2B2A] text-[#9C968F] hover:text-[#F5F2EE] flex items-center justify-center"
+                    className="w-8 h-8 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] disabled:opacity-40 border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center"
                   >
                     +
                   </button>

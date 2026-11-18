@@ -224,8 +224,8 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
         key={cue.id}
         className={`rounded-xl border px-3 py-2 flex items-center justify-between gap-2 transition ${
           isSelected
-            ? 'bg-[#252019] border-[#E5A958]'
-            : 'bg-[#1C1B1A] border-[#2D2B2A]'
+            ? 'bg-[var(--accent-amber-tint)] border-[#E5A958]'
+            : 'bg-[var(--bg-surface)] border-[var(--border-subtle)]'
         }`}
       >
         {isRenaming ? (
@@ -243,7 +243,7 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
                   setRenamingId(null);
                 }
               }}
-              className="flex-1 h-8 px-2.5 rounded-lg bg-[#141312] border border-[#E5A958] text-xs text-[#F5F2EE] focus:outline-none min-w-0"
+              className="flex-1 h-8 px-2.5 rounded-lg bg-[var(--bg-recessed)] border border-[#E5A958] text-xs text-[var(--text-primary)] focus:outline-none min-w-0"
             />
             <button
               type="button"
@@ -257,7 +257,7 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
               type="button"
               onClick={() => setRenamingId(null)}
               aria-label="Cancel rename"
-              className="w-7 h-7 rounded-full bg-[#242220] text-[#9C968F] flex items-center justify-center shrink-0"
+              className="w-7 h-7 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)] flex items-center justify-center shrink-0"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -277,17 +277,18 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
             <div className="flex items-center gap-2">
               <p
                 className={`text-xs font-semibold truncate ${
-                  isSelected ? 'text-[#E5A958]' : 'text-[#F5F2EE]'
+                  isSelected ? 'text-[var(--accent-amber-text)]' : 'text-[var(--text-primary)]'
                 }`}
               >
                 {cue.name}
               </p>
-              <span className="text-[10px] text-[#9C968F] shrink-0">
+              <span className="text-[10px] text-[var(--text-muted)] shrink-0">
                 {cue.source === 'imported' ? 'Imported' : 'Recorded'}
               </span>
             </div>
-            <p className="text-[11px] text-[#9C968F] tabular-nums">
-              {(cue.durationMs / 1000).toFixed(1)}s · {onSelectCustomCue ? 'tap to assign' : 'tap to preview'}
+            <p className="text-[11px] text-[var(--text-muted)] tabular-nums">
+              {(cue.durationMs / 1000).toFixed(1)}s ·{' '}
+              {onSelectCustomCue ? 'tap to assign' : 'tap to preview'}
             </p>
           </button>
         )}
@@ -298,7 +299,7 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
               type="button"
               onClick={() => onPreviewCustomCue(cue)}
               aria-label={`Preview ${cue.name}`}
-              className="w-8 h-8 rounded-full bg-[#242220] hover:bg-[#2D2B2A] text-[#E5A958] flex items-center justify-center"
+              className="w-8 h-8 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-[var(--accent-amber-text)] flex items-center justify-center"
             >
               <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
             </button>
@@ -309,7 +310,7 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
                 setRenameDraft(cue.name);
               }}
               aria-label={`Rename ${cue.name}`}
-              className="w-8 h-8 rounded-full hover:bg-[#242220] text-[#9C968F] hover:text-[#F5F2EE] flex items-center justify-center"
+              className="w-8 h-8 rounded-full hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center"
             >
               <Edit2 className="w-3.5 h-3.5" />
             </button>
@@ -317,7 +318,7 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
               type="button"
               onClick={() => void handleDelete(cue.id)}
               aria-label={`Delete ${cue.name}`}
-              className="w-8 h-8 rounded-full hover:bg-red-500/15 text-[#9C968F] hover:text-red-400 flex items-center justify-center"
+              className="w-8 h-8 rounded-full hover:bg-red-500/15 text-[var(--text-muted)] hover:text-red-500 flex items-center justify-center"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -328,14 +329,14 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
   };
 
   return (
-    <div className="rounded-2xl bg-[#141312] border border-[#2D2B2A] p-4 space-y-3.5">
+    <div className="rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] p-4 space-y-3.5">
       {/* Header + Import Audio Cue button */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-[11px] font-medium tracking-[0.2em] text-[#E5A958] uppercase">
+          <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--accent-amber-text)] uppercase">
             CUE POINT LIBRARY
           </p>
-          <p className="text-xs text-[#9C968F] mt-0.5">
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">
             Built-in studio cues, microphone recordings &amp; imported audio files
           </p>
         </div>
@@ -352,7 +353,7 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-[#242220] hover:bg-[#2D2B2A] border border-[#E5A958]/40 text-xs font-semibold text-[#E5A958] transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[#E5A958]/50 text-xs font-semibold text-[var(--accent-amber-text)] transition"
           >
             <FolderPlus className="w-3.5 h-3.5" />
             <span>+ Import Audio Cue</span>
@@ -363,7 +364,7 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
       {/* Custom/Imported Quick-Select Pills inside Bar Editor Modal */}
       {mode === 'bar-editor' && customCues.length > 0 && (
         <div>
-          <p className="text-[10px] font-medium tracking-[0.18em] text-[#9C968F] uppercase mb-2">
+          <p className="text-[10px] font-medium tracking-[0.18em] text-[var(--text-muted)] uppercase mb-2">
             YOUR RECORDED &amp; IMPORTED CUES
           </p>
           <div className="flex flex-wrap gap-2">
@@ -379,8 +380,8 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
                   }}
                   className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-xs font-medium transition ${
                     active
-                      ? 'bg-[#252019] border-[#E5A958] text-[#E5A958]'
-                      : 'bg-[#1C1B1A] border-[#2D2B2A] text-[#F5F2EE] hover:bg-[#242220]'
+                      ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                      : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
                   }`}
                 >
                   <Volume2 className="w-3 h-3 opacity-75" />
@@ -400,7 +401,7 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
           value={cueNameInput}
           onChange={(e) => setCueNameInput(e.target.value)}
           placeholder="Record mic cue label (e.g. Watch Tempo)"
-          className="flex-1 h-10 px-3 rounded-xl bg-[#1C1B1A] border border-[#2D2B2A] text-xs text-[#F5F2EE] placeholder:text-[#78736D] focus:border-[#E5A958] focus:outline-none disabled:opacity-60"
+          className="flex-1 h-10 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[#E5A958] focus:outline-none disabled:opacity-60"
         />
 
         {!isRecording ? (
@@ -424,18 +425,18 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
         )}
       </div>
 
-      {statusMsg && <p className="text-xs text-[#E5A958]">{statusMsg}</p>}
-      {errorMsg && <p className="text-xs text-red-400">{errorMsg}</p>}
+      {statusMsg && <p className="text-xs text-[var(--accent-amber-text)]">{statusMsg}</p>}
+      {errorMsg && <p className="text-xs text-red-500">{errorMsg}</p>}
 
       {/* Category Switcher inside Library */}
-      <div className="flex items-center gap-1.5 pt-1">
+      <div className="flex items-center gap-1.5 pt-1 flex-wrap">
         <button
           type="button"
           onClick={() => setLibraryTab('custom')}
           className={`px-3 py-1.5 rounded-full text-xs font-medium transition tabular-nums ${
             libraryTab === 'custom'
-              ? 'bg-[#252019] border border-[#E5A958] text-[#E5A958]'
-              : 'bg-[#1C1B1A] border border-[#2D2B2A] text-[#9C968F] hover:text-[#F5F2EE]'
+              ? 'bg-[var(--accent-amber-tint)] border border-[#E5A958] text-[var(--accent-amber-text)]'
+              : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
           Custom &amp; Imported ({customCues.length})
@@ -445,8 +446,8 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
           onClick={() => setLibraryTab('builtin')}
           className={`px-3 py-1.5 rounded-full text-xs font-medium transition tabular-nums ${
             libraryTab === 'builtin'
-              ? 'bg-[#252019] border border-[#E5A958] text-[#E5A958]'
-              : 'bg-[#1C1B1A] border border-[#2D2B2A] text-[#9C968F] hover:text-[#F5F2EE]'
+              ? 'bg-[var(--accent-amber-tint)] border border-[#E5A958] text-[var(--accent-amber-text)]'
+              : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
           Built-in ({BUNDLED_VOICE_CUES.length})
@@ -456,8 +457,8 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
           onClick={() => setLibraryTab('counts')}
           className={`px-3 py-1.5 rounded-full text-xs font-medium transition tabular-nums ${
             libraryTab === 'counts'
-              ? 'bg-[#252019] border border-[#E5A958] text-[#E5A958]'
-              : 'bg-[#1C1B1A] border border-[#2D2B2A] text-[#9C968F] hover:text-[#F5F2EE]'
+              ? 'bg-[var(--accent-amber-tint)] border border-[#E5A958] text-[var(--accent-amber-text)]'
+              : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
           Counts (1–7)
@@ -468,14 +469,14 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
       {libraryTab === 'custom' && (
         <div className="space-y-3">
           {customCues.length === 0 ? (
-            <p className="text-xs text-[#9C968F] py-2">
+            <p className="text-xs text-[var(--text-muted)] py-2">
               No recorded or imported cues yet. Tap Record or + Import Audio Cue above (MP3, WAV, M4A, OGG).
             </p>
           ) : (
             <>
               {recordedCues.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-[10px] tracking-[0.18em] text-[#78736D] uppercase">
+                  <p className="text-[10px] tracking-[0.18em] text-[var(--text-subtle)] uppercase">
                     USER-RECORDED ({recordedCues.length})
                   </p>
                   {recordedCues.map(renderCustomCueRow)}
@@ -483,7 +484,7 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
               )}
               {importedCues.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-[10px] tracking-[0.18em] text-[#78736D] uppercase">
+                  <p className="text-[10px] tracking-[0.18em] text-[var(--text-subtle)] uppercase">
                     USER-IMPORTED ({importedCues.length})
                   </p>
                   {importedCues.map(renderCustomCueRow)}
@@ -503,8 +504,8 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
                 key={c.url}
                 className={`rounded-xl border px-2.5 py-2 flex items-center justify-between gap-2 ${
                   active
-                    ? 'bg-[#252019] border-[#E5A958]'
-                    : 'bg-[#1C1B1A] border-[#2D2B2A]'
+                    ? 'bg-[var(--accent-amber-tint)] border-[#E5A958]'
+                    : 'bg-[var(--bg-surface)] border-[var(--border-subtle)]'
                 }`}
               >
                 <button
@@ -517,7 +518,7 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
                     }
                   }}
                   className={`text-xs font-medium truncate text-left flex-1 ${
-                    active ? 'text-[#E5A958]' : 'text-[#F5F2EE]'
+                    active ? 'text-[var(--accent-amber-text)]' : 'text-[var(--text-primary)]'
                   }`}
                 >
                   {c.label}
@@ -526,7 +527,7 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
                   type="button"
                   onClick={() => onPreviewBundledCue(c.url)}
                   aria-label={`Preview ${c.label}`}
-                  className="w-7 h-7 rounded-full bg-[#242220] text-[#E5A958] flex items-center justify-center shrink-0"
+                  className="w-7 h-7 rounded-full bg-[var(--bg-elevated)] text-[var(--accent-amber-text)] flex items-center justify-center shrink-0"
                 >
                   <Play className="w-3 h-3 fill-current ml-0.5" />
                 </button>
@@ -543,9 +544,9 @@ export const CuePointLibrary: React.FC<CuePointLibraryProps> = ({
               key={c.url}
               type="button"
               onClick={() => onPreviewBundledCue(c.url)}
-              className="h-10 rounded-xl bg-[#1C1B1A] hover:bg-[#242220] border border-[#2D2B2A] text-xs font-semibold text-[#F5F2EE] flex items-center justify-center gap-1 tabular-nums"
+              className="h-10 rounded-xl bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-primary)] flex items-center justify-center gap-1 tabular-nums"
             >
-              <Play className="w-3 h-3 text-[#E5A958] fill-current" />
+              <Play className="w-3 h-3 text-[var(--accent-amber-text)] fill-current" />
               <span>{idx + 1}</span>
             </button>
           ))}

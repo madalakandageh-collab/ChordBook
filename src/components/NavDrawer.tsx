@@ -29,23 +29,23 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
     {
       id: 'sheets',
       label: 'Your sheets',
-      icon: <BookOpen className="w-5 h-5 text-[#E5A958]" />,
+      icon: <BookOpen className="w-5 h-5 text-[var(--accent-amber-text)]" />,
     },
     {
       id: 'live-mode',
       label: 'Live mode',
-      icon: <Radio className="w-5 h-5 text-[#E5A958]" />,
+      icon: <Radio className="w-5 h-5 text-[var(--accent-amber-text)]" />,
       badge: memberCount > 0 ? `${memberCount} synced` : undefined,
     },
     {
       id: 'practice-select',
       label: 'Practice',
-      icon: <GraduationCap className="w-5 h-5 text-[#E5A958]" />,
+      icon: <GraduationCap className="w-5 h-5 text-[var(--accent-amber-text)]" />,
     },
     {
       id: 'local-wifi',
       label: 'Local Wi-Fi',
-      icon: <Wifi className="w-5 h-5 text-[#E5A958]" />,
+      icon: <Wifi className="w-5 h-5 text-[var(--accent-amber-text)]" />,
     },
   ];
 
@@ -58,23 +58,24 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex">
       <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-[2px] transition-opacity"
+        style={{ backgroundColor: 'var(--bg-backdrop)' }}
+        className="fixed inset-0 backdrop-blur-[2px] transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
       <aside
-        className="relative z-10 w-[290px] max-w-[82vw] h-full bg-[#161514] border-r border-[#2D2B2A] flex flex-col p-6 shadow-2xl"
+        className="relative z-10 w-[290px] max-w-[82vw] h-full bg-[var(--bg-drawer)] border-r border-[var(--border-subtle)] flex flex-col p-6 shadow-2xl"
         aria-label="Navigation Drawer"
       >
         <div className="flex items-center justify-between pb-6">
-          <span className="text-xs font-medium tracking-[0.28em] text-[#9C968F] uppercase">
+          <span className="text-xs font-medium tracking-[0.28em] text-[var(--text-muted)] uppercase">
             CHORDBOOK
           </span>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close navigation menu"
-            className="w-10 h-10 rounded-full bg-[#242220] hover:bg-[#2D2B2A] text-[#F5F2EE] flex items-center justify-center transition"
+            className="w-10 h-10 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-center transition"
           >
             <X className="w-4 h-4" />
           </button>
@@ -93,8 +94,8 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
                 }}
                 className={`w-full flex items-center justify-between gap-3 px-3 py-3.5 rounded-xl text-left transition ${
                   active
-                    ? 'bg-[#E5A958]/12 text-[#F5F2EE]'
-                    : 'text-[#F5F2EE]/90 hover:bg-[#1C1B1A]'
+                    ? 'bg-[var(--accent-amber-tint)] text-[var(--text-primary)]'
+                    : 'text-[var(--text-primary)]/90 hover:bg-[var(--bg-elevated)]'
                 }`}
               >
                 <span className="flex items-center gap-4">
@@ -102,7 +103,7 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
                   <span className="text-[16px] font-medium whitespace-nowrap">{item.label}</span>
                 </span>
                 {item.badge && (
-                  <span className="text-[11px] font-medium text-[#E5A958] tabular-nums">
+                  <span className="text-[11px] font-medium text-[var(--accent-amber-text)] tabular-nums">
                     {item.badge}
                   </span>
                 )}
@@ -115,8 +116,8 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
           <PWAInstallButton variant="drawer" />
         </div>
 
-        <div className="mt-8 pt-6 border-t border-[#2D2B2A]/70">
-          <p className="text-[13px] leading-relaxed text-[#9C968F]">
+        <div className="mt-8 pt-6 border-t border-[var(--border-subtle)]">
+          <p className="text-[13px] leading-relaxed text-[var(--text-muted)]">
             Everything is stored on this device — songs, setlists and settings work without a connection.
           </p>
         </div>
