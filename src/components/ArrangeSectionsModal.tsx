@@ -44,7 +44,7 @@ export const ArrangeSectionsModal: React.FC<ArrangeSectionsModalProps> = ({
   // Precompute live auto-recalculated bar ranges across current section order
   let runningBar = 0;
   const barRanges = sections.map((sec) => {
-    if (sec.isReference || sec.bars.length === 0) {
+    if (sec.isReference || !Array.isArray(sec.bars) || sec.bars.length === 0) {
       return { start: 0, end: 0, span: 0 };
     }
     const span = sec.bars.reduce(

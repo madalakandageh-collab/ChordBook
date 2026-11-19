@@ -88,10 +88,10 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredSongs = songs.filter((song) => {
     if (!normalizedQuery) return true;
-    const displayKey = transposeKey(song.key, song.transpose || 0);
+    const displayKey = transposeKey(song.key || 'C', song.transpose || 0);
     return (
-      song.title.toLowerCase().includes(normalizedQuery) ||
-      song.artist.toLowerCase().includes(normalizedQuery) ||
+      (song.title || '').toLowerCase().includes(normalizedQuery) ||
+      (song.artist || '').toLowerCase().includes(normalizedQuery) ||
       displayKey.toLowerCase().includes(normalizedQuery)
     );
   });

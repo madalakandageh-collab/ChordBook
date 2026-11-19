@@ -1,4 +1,4 @@
-import type { Bar, BarMeter, LastBarCuePassRule, Song, TimelineBar } from '../types';
+import type { Bar, BarMeter, LastBarCuePassRule, Section, Song, TimelineBar } from '../types';
 
 const SHARP_SCALE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FLAT_SCALE = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -79,7 +79,7 @@ export function transposeChord(chord: string, semitones: number, targetKey?: str
 }
 
 export function transposeKey(baseKey: string, semitones: number): string {
-  const trimmed = baseKey.trim();
+  const trimmed = (baseKey || '').trim();
   if (!trimmed || semitones === 0) return trimmed;
   const match = trimmed.match(/^([A-G][#b]?)(.*)$/);
   if (!match) return trimmed;
@@ -95,7 +95,7 @@ export function formatChordDisplay(chord: string): string {
 }
 
 export function parseMeterBeats(meter: BarMeter | string): number {
-  const [numStr] = meter.split('/');
+  const [numStr] = (meter || '4/4').split('/');
   const num = parseInt(numStr, 10);
   if (Number.isNaN(num) || num < 1) return 4;
   return num;
@@ -164,15 +164,20 @@ export function shouldTriggerBarVoiceCueAndCount(step: TimelineBar): boolean {
   return true;
 }
 
-export function getSectionTotalBars(section: { bars: Bar[]; isReference?: boolean }): number {
-  if (section.isReference || section.bars.length === 0) return 0;
+export function getSectionTotalBars(
+  section?: { bars?: Bar[] | null; isReference?: boolean } | null
+): number {
+  if (!section || section.isReference || !Array.isArray(section.bars) || section.bars.length === 0) {
+    return 0;
+  }
   return section.bars.reduce(
-    (bAcc, bar) => bAcc + (bar.repeat && bar.repeat > 1 ? bar.repeat : 1),
+    (bAcc, bar) => bAcc + (bar?.repeat && bar.repeat > 1 ? bar.repeat : 1),
     0
   );
 }
 
-export function getSongTotalBars(song: Song): number {
+export function getSongTotalBars(song?: Partial<Song> | null): number {
+  if (!song || !Array.isArray(song.sections)) return 0;
   return song.sections.reduce((acc, sec) => acc + getSectionTotalBars(sec), 0);
 }
 
@@ -202,10 +207,11 @@ export function buildSongTimeline(
   loopSectionId: string | null = null
 ): TimelineBar[] {
   const timeline: TimelineBar[] = [];
+  if (!song || !Array.isArray(song.sections)) return timeline;
   let displayBarCounter = 0;
 
   for (const section of song.sections) {
-    if (section.isReference || section.bars.length === 0) {
+    if (!section || section.isReference || !Array.isArray(section.bars) || section.bars.length === 0) {
       continue;
     }
 
@@ -266,10 +272,12 @@ export function buildSongTimeline(
 }
 
 export function getGlobalDisplayBarNumber(song: Song, targetSectionId: string, targetBarId: string): number {
+  if (!song || !Array.isArray(song.sections)) return 1;
   let count = 0;
   for (const sec of song.sections) {
-    if (sec.isReference || sec.bars.length === 0) continue;
+    if (!sec || sec.isReference || !Array.isArray(sec.bars) || sec.bars.length === 0) continue;
     for (const bar of sec.bars) {
+      if (!bar) continue;
       const repeats = bar.repeat && bar.repeat > 1 ? bar.repeat : 1;
       if (sec.id === targetSectionId && bar.id === targetBarId) {
         return count + 1;
@@ -326,6 +334,70 @@ export function chordToMidiNotes(chordStr: string, semitones = 0): number[] {
   }
 
   return intervals.map((iv) => baseMidi + iv);
+}
+
+export function normalizeSection(raw: Partial<Section> | null | undefined, idx = 0): Section {
+  const safe = raw && typeof raw === 'object' ? raw : {};
+  const rawBars: unknown[] = Array.isArray(safe.bars) ? safe.bars : [];
+  const bars: Bar[] = rawBars
+    .filter((b): b is Partial<Bar> => Boolean(b && typeof b === 'object'))
+    .map((b, bIdx) => ({
+      ...b,
+      id: typeof b.id === 'string' && b.id ? b.id : `bar-${idx}-${bIdx}-${Math.random().toString(36).slice(2, 6)}`,
+      chord: typeof b.chord === 'string' ? b.chord : '-',
+      repeat: typeof b.repeat === 'number' && b.repeat > 0 ? b.repeat : 1,
+    }));
+
+  return {
+    ...safe,
+    id: typeof safe.id === 'string' && safe.id ? safe.id : `sec-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+    name: typeof safe.name === 'string' && safe.name.trim() ? safe.name : `Section ${idx + 1}`,
+    bars,
+  };
+}
+
+export function normalizeSong(raw: Partial<Song> | null | undefined, fallbackIdx = 0): Song {
+  const safe = raw && typeof raw === 'object' ? raw : {};
+  const rawSections: unknown[] = Array.isArray(safe.sections) ? safe.sections : [];
+  const sections = rawSections
+    .filter((sec): sec is Partial<Section> => Boolean(sec && typeof sec === 'object'))
+    .map((sec, idx) => normalizeSection(sec, idx));
+
+  const rawLyrics = Array.isArray(safe.lyrics) ? safe.lyrics : [];
+  const lyrics = rawLyrics
+    .filter((l) => Boolean(l && typeof l === 'object'))
+    .map((l, idx) => ({
+      id: typeof l.id === 'string' && l.id ? l.id : `lyr-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+      label: typeof l.label === 'string' ? l.label : `Section ${idx + 1}`,
+      lines: Array.isArray(l.lines) ? l.lines.map((line) => String(line ?? '')) : [],
+    }));
+
+  return {
+    id:
+      typeof safe.id === 'string' && safe.id
+        ? safe.id
+        : `song-${fallbackIdx}-${Math.random().toString(36).slice(2, 7)}`,
+    title: typeof safe.title === 'string' && safe.title.trim() ? safe.title.trim() : 'Untitled Song',
+    artist: typeof safe.artist === 'string' && safe.artist.trim() ? safe.artist.trim() : 'Unknown Artist',
+    key: typeof safe.key === 'string' && safe.key.trim() ? safe.key.trim() : 'C',
+    bpm: typeof safe.bpm === 'number' && Number.isFinite(safe.bpm) && safe.bpm > 0 ? safe.bpm : 92,
+    timeSignature:
+      safe.timeSignature === '3/4' || safe.timeSignature === '6/8' || safe.timeSignature === '4/4'
+        ? safe.timeSignature
+        : '4/4',
+    transpose: typeof safe.transpose === 'number' && Number.isFinite(safe.transpose) ? safe.transpose : 0,
+    sections,
+    lyrics,
+    updatedAt: typeof safe.updatedAt === 'number' && Number.isFinite(safe.updatedAt) ? safe.updatedAt : Date.now(),
+  };
+}
+
+export function normalizeSongsList(raw: unknown, fallback: Song[]): Song[] {
+  if (!Array.isArray(raw)) return fallback;
+  const cleaned = raw
+    .filter((item): item is Partial<Song> => Boolean(item && typeof item === 'object'))
+    .map((item, idx) => normalizeSong(item, idx));
+  return cleaned.length > 0 ? cleaned : fallback;
 }
 
 export function createEmptyBar(chord = '-'): Bar {

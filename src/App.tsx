@@ -43,7 +43,13 @@ import type {
   SynthBackingSettings,
   TimeSignature,
 } from './types';
-import { buildSongTimeline, createEmptyBar, getGlobalDisplayBarNumber } from './utils/chords';
+import {
+  buildSongTimeline,
+  createEmptyBar,
+  getGlobalDisplayBarNumber,
+  normalizeSong,
+  normalizeSongsList,
+} from './utils/chords';
 import {
   exportCustomVoiceCuesAsBase64,
   importCustomVoiceCuesFromBase64,
@@ -92,7 +98,10 @@ export default function App() {
   const isDedicatedMemberUrl = urlMode === 'member';
 
   const [songs, setSongs] = useState<Song[]>(() =>
-    loadFromStorage<Song[]>(STORAGE_KEYS.songs, INITIAL_SONGS)
+    normalizeSongsList(
+      loadFromStorage<unknown>(STORAGE_KEYS.songs, INITIAL_SONGS),
+      INITIAL_SONGS
+    )
   );
   const [setlists, setSetlists] = useState<Setlist[]>(() =>
     loadFromStorage<Setlist[]>(STORAGE_KEYS.setlists, INITIAL_SETLISTS)
@@ -241,7 +250,9 @@ export default function App() {
     roomId,
     role: isMemberRole ? 'member' : 'leader',
     onRemoteState: useCallback((state: RoomSyncState) => {
-      setRemoteMemberState(state);
+      setRemoteMemberState(
+        state.song ? { ...state, song: normalizeSong(state.song) } : state
+      );
     }, []),
   });
 
@@ -490,18 +501,12 @@ export default function App() {
             (x) => x.id === incomingId || x.title.trim().toLowerCase() === normalizedTitle
           );
 
-          const normalizedSong: Song = {
+          const normalizedSong = normalizeSong({
+            ...raw,
             id: matchIdx >= 0 ? mergedSongs[matchIdx].id : incomingId,
             title: raw.title.trim(),
-            artist: raw.artist || 'Unknown Artist',
-            key: raw.key || 'C',
-            bpm: Number(raw.bpm) || 92,
-            timeSignature: raw.timeSignature || '4/4',
-            transpose: Number(raw.transpose) || 0,
-            sections: Array.isArray(raw.sections) ? raw.sections : [],
-            lyrics: Array.isArray(raw.lyrics) ? raw.lyrics : [],
             updatedAt: Date.now(),
-          };
+          });
 
           songIdMap.set(incomingId, normalizedSong.id);
           if (matchIdx >= 0) {
