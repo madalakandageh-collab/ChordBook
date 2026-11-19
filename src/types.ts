@@ -270,6 +270,7 @@ export interface SynthLayerConfig {
   volumeDb: number; // -36 to +6 dB
   pan: number; // -1 to +1
   muted: boolean;
+  fillEmptyBars?: boolean; // default false
 }
 
 export interface PadLayerConfig {
@@ -277,6 +278,7 @@ export interface PadLayerConfig {
   volumeDb: number; // -36 to +6 dB
   pan: number; // -1 to +1
   muted: boolean;
+  fillEmptyBars?: boolean; // default false
 }
 
 export interface ArpLayerConfig {
@@ -285,6 +287,7 @@ export interface ArpLayerConfig {
   volumeDb: number; // -36 to +6 dB
   pan: number; // -1 to +1
   muted: boolean;
+  fillEmptyBars?: boolean; // default false
 }
 
 export interface SynthBackingSettings {

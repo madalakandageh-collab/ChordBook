@@ -75,16 +75,19 @@ export const DEFAULT_SYNTH_BACKING_SETTINGS: SynthBackingSettings = {
     volumeDb: -5,
     pan: -0.15,
     muted: false,
+    fillEmptyBars: false,
   },
   pad: {
     volumeDb: -12,
     pan: 0.15,
     muted: false,
+    fillEmptyBars: false,
   },
   arp: {
     volumeDb: -4,
     pan: 0,
     muted: false,
+    fillEmptyBars: false,
   },
 };
 
@@ -229,14 +232,17 @@ export function loadSynthBackingSettings(): SynthBackingSettings {
       synth: {
         ...DEFAULT_SYNTH_BACKING_SETTINGS.synth,
         ...(parsed.synth || {}),
+        fillEmptyBars: Boolean(parsed.synth?.fillEmptyBars),
       },
       pad: {
         ...DEFAULT_SYNTH_BACKING_SETTINGS.pad,
         ...(parsed.pad || {}),
+        fillEmptyBars: Boolean(parsed.pad?.fillEmptyBars),
       },
       arp: {
         ...DEFAULT_SYNTH_BACKING_SETTINGS.arp,
         ...(parsed.arp || {}),
+        fillEmptyBars: Boolean(parsed.arp?.fillEmptyBars),
       },
     };
   } catch {
@@ -250,6 +256,11 @@ export function saveSynthBackingSettings(settings: SynthBackingSettings): void {
   } catch {
     // Ignore storage quota errors
   }
+}
+
+function isEmptyChordToken(chordStr: string | undefined | null): boolean {
+  const clean = (chordStr || '').trim();
+  return !clean || clean === '-' || clean === '—';
 }
 
 function buildChordNotes(chordStr: string, semitones: number) {
@@ -1216,6 +1227,9 @@ export class ToneSynthBackingEngine {
   private activeArpSectionId: string | null = null;
   private arpStepCursor = 0;
 
+  // Most recent preceding non-empty chord for independent per-bus Fill Empty Bars resolution
+  private lastNonEmptyChord: { chordStr: string; semitones: number } | null = null;
+
   // Preview lifecycle guard
   private activePreviewCleanup: (() => void) | null = null;
   private activePreviewTimer: number | null = null;
@@ -1409,13 +1423,17 @@ export class ToneSynthBackingEngine {
     }
   }
 
-  public onPlaybackStart(rawCtx: AudioContext): void {
+  public onPlaybackStart(
+    rawCtx: AudioContext,
+    initialSeedChord?: { chordStr: string; semitones: number } | null
+  ): void {
     this.stopActivePreview();
     this.isPlayingLive = true;
     this.activeSynthSectionId = null;
     this.activePadSectionId = null;
     this.activeArpSectionId = null;
     this.arpStepCursor = 0;
+    this.lastNonEmptyChord = initialSeedChord ?? null;
 
     if (!this.settings.masterEnabled) {
       this.teardownNodes();
@@ -1448,7 +1466,25 @@ export class ToneSynthBackingEngine {
     this.ensureToneContext(params.rawCtx);
     this.buildNodes();
 
-    // 1. Per-Section Synth (Blue Dot) with Bar-Range Gating
+    const isEmptyBar = isEmptyChordToken(params.chordStr);
+    if (!isEmptyBar) {
+      this.lastNonEmptyChord = {
+        chordStr: params.chordStr,
+        semitones: params.semitones,
+      };
+    }
+
+    const resolveBusChord = (fillEmpty?: boolean) => {
+      if (!isEmptyBar) {
+        return { chordStr: params.chordStr, semitones: params.semitones };
+      }
+      if (fillEmpty && this.lastNonEmptyChord) {
+        return this.lastNonEmptyChord;
+      }
+      return null;
+    };
+
+    // 1. Per-Section Synth (Blue Dot) with Bar-Range Gating & Independent Fill-Empty-Bars
     const isSynthAllowed =
       !this.settings.synth.muted &&
       isBarInSectionLayerRange(
@@ -1462,13 +1498,14 @@ export class ToneSynthBackingEngine {
     }
     this.activeSynthSectionId = params.sectionId;
 
+    const synthChord = resolveBusChord(this.settings.synth.fillEmptyBars);
     if (!isSynthAllowed) {
       this.releaseAllSynthVoices(params.time);
-    } else if (params.sectionSynth) {
+    } else if (params.sectionSynth && synthChord) {
       const chain = this.getOrCreateSynthChain(params.sectionSynth.tone);
       scheduleSectionSynthPattern(chain.poly, {
-        chordStr: params.chordStr,
-        semitones: params.semitones,
+        chordStr: synthChord.chordStr,
+        semitones: synthChord.semitones,
         time: params.time,
         durationSec: params.durationSec,
         beatDurationSec: params.beatDurationSec,
@@ -1477,7 +1514,7 @@ export class ToneSynthBackingEngine {
       });
     }
 
-    // 2. Per-Section Multi-Pad (Green Dot) with Bar-Range Gating
+    // 2. Per-Section Multi-Pad (Green Dot) with Bar-Range Gating & Independent Fill-Empty-Bars
     const isPadAllowed =
       !this.settings.pad.muted &&
       isBarInSectionLayerRange(
@@ -1491,13 +1528,14 @@ export class ToneSynthBackingEngine {
     }
     this.activePadSectionId = params.sectionId;
 
+    const padChord = resolveBusChord(this.settings.pad.fillEmptyBars);
     if (!isPadAllowed) {
       this.releaseAllPadVoices(params.time);
-    } else if (params.sectionMultiPad) {
+    } else if (params.sectionMultiPad && padChord) {
       const chain = this.getOrCreatePadChain(params.sectionMultiPad.tone);
       scheduleSectionPadPattern(chain.poly, {
-        chordStr: params.chordStr,
-        semitones: params.semitones,
+        chordStr: padChord.chordStr,
+        semitones: padChord.semitones,
         time: params.time,
         durationSec: params.durationSec,
         beatDurationSec: params.beatDurationSec,
@@ -1505,7 +1543,7 @@ export class ToneSynthBackingEngine {
       });
     }
 
-    // 3. Per-Section Arpeggiator (Orange Dot) with Bar-Range Gating
+    // 3. Per-Section Arpeggiator (Orange Dot) with Bar-Range Gating & Independent Fill-Empty-Bars
     // Directly scheduled on the Web Audio clock in lockstep with AudioEngine (no Transport/setTimeout race)
     const isArpAllowed =
       !this.settings.arp.muted &&
@@ -1521,15 +1559,16 @@ export class ToneSynthBackingEngine {
     }
     this.activeArpSectionId = params.sectionId;
 
+    const arpChord = resolveBusChord(this.settings.arp.fillEmptyBars);
     if (!isArpAllowed) {
       this.releaseAllArpVoices(params.time);
       this.arpStepCursor = 0;
-    } else if (params.sectionArp) {
+    } else if (params.sectionArp && arpChord) {
       const arpTone = params.sectionArp.tone || DEFAULT_SECTION_ARP.tone;
       const chain = this.getOrCreateArpChain(arpTone);
       this.arpStepCursor = scheduleSectionArpPattern(chain.poly, {
-        chordStr: params.chordStr,
-        semitones: params.semitones,
+        chordStr: arpChord.chordStr,
+        semitones: arpChord.semitones,
         time: params.time,
         durationSec: params.durationSec,
         beatDurationSec: params.beatDurationSec,
@@ -1688,6 +1727,7 @@ export class ToneSynthBackingEngine {
     this.activePadSectionId = null;
     this.activeArpSectionId = null;
     this.arpStepCursor = 0;
+    this.lastNonEmptyChord = null;
 
     this.releaseAllSynthVoices();
     this.releaseAllPadVoices();
@@ -1880,9 +1920,15 @@ export async function exportFullProjectMixWav(options: {
             sectionArp: step.sectionArp,
           });
         } else if (b === 1) {
+          let emptyBeats = 1;
+          for (let nb = b; nb < step.beatsPerBar; nb++) {
+            const nextVal = (step.bar.beatChords[nb] || '').trim();
+            if (nextVal && nextVal !== '-') break;
+            emptyBeats += 1;
+          }
           chordSegments.push({
             time: cursorTime,
-            durationSec: beatSec * step.beatsPerBar,
+            durationSec: beatSec * emptyBeats,
             beatDurationSec: beatSec,
             effectiveBpm: bpm,
             chordStr: '-',
@@ -2054,9 +2100,28 @@ export async function exportFullProjectMixWav(options: {
         let lastOfflineSynthSectionId: string | null = null;
         let lastOfflineArpSectionId: string | null = null;
         let offlineArpStepCursor = 0;
+        let offlineLastNonEmptyChord: { chordStr: string; semitones: number } | null = null;
 
         for (const seg of chordSegments) {
-          // 1. Synth with bar-range gate
+          const isEmptySeg = isEmptyChordToken(seg.chordStr);
+          if (!isEmptySeg) {
+            offlineLastNonEmptyChord = {
+              chordStr: seg.chordStr,
+              semitones: seg.semitones,
+            };
+          }
+
+          const resolveOfflineBusChord = (fillEmpty?: boolean) => {
+            if (!isEmptySeg) {
+              return { chordStr: seg.chordStr, semitones: seg.semitones };
+            }
+            if (fillEmpty && offlineLastNonEmptyChord) {
+              return offlineLastNonEmptyChord;
+            }
+            return null;
+          };
+
+          // 1. Synth with bar-range gate & independent Fill-Empty-Bars
           const isSynthAllowed =
             !synthSettings.synth.muted &&
             isBarInSectionLayerRange(
@@ -2069,13 +2134,14 @@ export async function exportFullProjectMixWav(options: {
           }
           lastOfflineSynthSectionId = seg.sectionId;
 
+          const offlineSynthChord = resolveOfflineBusChord(synthSettings.synth.fillEmptyBars);
           if (!isSynthAllowed) {
             for (const c of offlineSynthChains.values()) c.poly.releaseAll(seg.time);
-          } else if (seg.sectionSynth) {
+          } else if (seg.sectionSynth && offlineSynthChord) {
             const chain = getOfflineSynthChain(seg.sectionSynth.tone);
             scheduleSectionSynthPattern(chain.poly, {
-              chordStr: seg.chordStr,
-              semitones: seg.semitones,
+              chordStr: offlineSynthChord.chordStr,
+              semitones: offlineSynthChord.semitones,
               time: seg.time,
               durationSec: seg.durationSec,
               beatDurationSec: seg.beatDurationSec,
@@ -2084,7 +2150,7 @@ export async function exportFullProjectMixWav(options: {
             });
           }
 
-          // 2. Multi-Pad with bar-range gate
+          // 2. Multi-Pad with bar-range gate & independent Fill-Empty-Bars
           const isPadAllowed =
             !synthSettings.pad.muted &&
             isBarInSectionLayerRange(
@@ -2097,13 +2163,14 @@ export async function exportFullProjectMixWav(options: {
           }
           lastOfflinePadSectionId = seg.sectionId;
 
+          const offlinePadChord = resolveOfflineBusChord(synthSettings.pad.fillEmptyBars);
           if (!isPadAllowed) {
             for (const c of offlinePadChains.values()) c.poly.releaseAll(seg.time);
-          } else if (seg.sectionMultiPad) {
+          } else if (seg.sectionMultiPad && offlinePadChord) {
             const chain = getOfflinePadChain(seg.sectionMultiPad.tone);
             scheduleSectionPadPattern(chain.poly, {
-              chordStr: seg.chordStr,
-              semitones: seg.semitones,
+              chordStr: offlinePadChord.chordStr,
+              semitones: offlinePadChord.semitones,
               time: seg.time,
               durationSec: seg.durationSec,
               beatDurationSec: seg.beatDurationSec,
@@ -2111,7 +2178,7 @@ export async function exportFullProjectMixWav(options: {
             });
           }
 
-          // 3. Arpeggiator with bar-range gate
+          // 3. Arpeggiator with bar-range gate & independent Fill-Empty-Bars
           const isArpAllowed =
             !synthSettings.arp.muted &&
             isBarInSectionLayerRange(
@@ -2125,15 +2192,16 @@ export async function exportFullProjectMixWav(options: {
           }
           lastOfflineArpSectionId = seg.sectionId;
 
+          const offlineArpChord = resolveOfflineBusChord(synthSettings.arp.fillEmptyBars);
           if (!isArpAllowed) {
             for (const c of offlineArpChains.values()) c.poly.releaseAll(seg.time);
             offlineArpStepCursor = 0;
-          } else if (seg.sectionArp) {
+          } else if (seg.sectionArp && offlineArpChord) {
             const arpTone = seg.sectionArp.tone || DEFAULT_SECTION_ARP.tone;
             const chain = getOfflineArpChain(arpTone);
             offlineArpStepCursor = scheduleSectionArpPattern(chain.poly, {
-              chordStr: seg.chordStr,
-              semitones: seg.semitones,
+              chordStr: offlineArpChord.chordStr,
+              semitones: offlineArpChord.semitones,
               time: seg.time,
               durationSec: seg.durationSec,
               beatDurationSec: seg.beatDurationSec,

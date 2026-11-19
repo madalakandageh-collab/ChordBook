@@ -41,7 +41,10 @@ export interface PlaybackCallbacks {
   onBarChange: (timelineIndex: number, displayBarNumber: number, sectionId: string, beat: number, isCountIn: boolean) => void;
   onBeat: (beat: number, totalBeats: number, isCountIn: boolean) => void;
   onStop: () => void;
-  onPlaybackStart?: (rawCtx: AudioContext) => void;
+  onPlaybackStart?: (
+    rawCtx: AudioContext,
+    initialSeedChord?: { chordStr: string; semitones: number } | null
+  ) => void;
   onChordSchedule?: (event: ChordScheduleEvent) => void;
 }
 
@@ -482,7 +485,35 @@ export class ChordbookAudioEngine {
     this.isRunning = true;
     this.nextNoteTime = ctx.currentTime + 0.06;
 
-    this.callbacks.onPlaybackStart?.(ctx);
+    // Scan preceding bars so seeking directly to an empty bar still knows the preceding chord
+    let initialSeedChord: { chordStr: string; semitones: number } | null = null;
+    for (let i = this.currentStepIndex - 1; i >= 0; i--) {
+      const prevStep = this.timeline[i];
+      if (!prevStep) continue;
+      const prevSemitones = this.globalTranspose + prevStep.sectionTranspose;
+      if (hasBeatSplits(prevStep.bar) && prevStep.bar.beatChords) {
+        let foundBeatChord: string | null = null;
+        for (let b = prevStep.bar.beatChords.length - 1; b >= 0; b--) {
+          const tok = (prevStep.bar.beatChords[b] || '').trim();
+          if (tok && tok !== '-' && tok !== '—') {
+            foundBeatChord = tok;
+            break;
+          }
+        }
+        if (foundBeatChord) {
+          initialSeedChord = { chordStr: foundBeatChord, semitones: prevSemitones };
+          break;
+        }
+      } else {
+        const tok = (prevStep.bar.chord || '').trim();
+        if (tok && tok !== '-' && tok !== '—') {
+          initialSeedChord = { chordStr: tok, semitones: prevSemitones };
+          break;
+        }
+      }
+    }
+
+    this.callbacks.onPlaybackStart?.(ctx, initialSeedChord);
     this.startBackgroundKeepAlive(ctx);
     this.scheduler();
     this.startSchedulerTicker();
@@ -718,12 +749,18 @@ export class ChordbookAudioEngine {
             currentStep
           );
         } else if (beatNum === 1) {
-          // Ensure bar-boundary tracking & bar-range exits still run on split bars with a beat-1 rest
+          let emptyBeats = 1;
+          for (let nb = beatNum; nb < beatsInBar; nb++) {
+            const nextVal = (currentStep.bar.beatChords[nb] || '').trim();
+            if (nextVal && nextVal !== '-') break;
+            emptyBeats += 1;
+          }
+          // Ensure bar-boundary tracking & bar-range exits (and optional fill-empty-bar) use exact empty beat span
           this.playChord(
             scheduledTime,
             '-',
             totalTranspose,
-            beatDurationSec * beatsInBar,
+            beatDurationSec * emptyBeats,
             beatDurationSec,
             effectiveBpm,
             currentStep

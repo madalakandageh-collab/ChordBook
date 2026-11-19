@@ -454,6 +454,39 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
               />
             </div>
           </div>
+
+          <div className="pt-1 border-t border-[var(--border-subtle)]/70 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(synthSettings.pad.fillEmptyBars)}
+              onClick={() =>
+                onUpdateSynthSettings({
+                  ...synthSettings,
+                  pad: {
+                    ...synthSettings.pad,
+                    fillEmptyBars: !synthSettings.pad.fillEmptyBars,
+                  },
+                })
+              }
+              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition ${
+                synthSettings.pad.fillEmptyBars
+                  ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-400'
+                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+              }`}
+            >
+              <span className="text-left">Fill Empty Bars (Pad Only)</span>
+              <span
+                className={`px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase shrink-0 ${
+                  synthSettings.pad.fillEmptyBars
+                    ? 'bg-emerald-500 text-[#0B1612]'
+                    : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]'
+                }`}
+              >
+                {synthSettings.pad.fillEmptyBars ? 'ON' : 'OFF'}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Synthesizer Bus (Blue Dots) */}
@@ -583,6 +616,39 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
               />
             </div>
           </div>
+
+          <div className="pt-1 border-t border-[var(--border-subtle)]/70 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(synthSettings.synth.fillEmptyBars)}
+              onClick={() =>
+                onUpdateSynthSettings({
+                  ...synthSettings,
+                  synth: {
+                    ...synthSettings.synth,
+                    fillEmptyBars: !synthSettings.synth.fillEmptyBars,
+                  },
+                })
+              }
+              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition ${
+                synthSettings.synth.fillEmptyBars
+                  ? 'bg-sky-500/15 border-sky-500/50 text-sky-400'
+                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+              }`}
+            >
+              <span className="text-left">Fill Empty Bars (Synth Only)</span>
+              <span
+                className={`px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase shrink-0 ${
+                  synthSettings.synth.fillEmptyBars
+                    ? 'bg-sky-500 text-[#071620]'
+                    : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]'
+                }`}
+              >
+                {synthSettings.synth.fillEmptyBars ? 'ON' : 'OFF'}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Arpeggiator Bus (Orange Dots) */}
@@ -711,6 +777,39 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
                 className="w-full accent-orange-400"
               />
             </div>
+          </div>
+
+          <div className="pt-1 border-t border-[var(--border-subtle)]/70 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(synthSettings.arp.fillEmptyBars)}
+              onClick={() =>
+                onUpdateSynthSettings({
+                  ...synthSettings,
+                  arp: {
+                    ...synthSettings.arp,
+                    fillEmptyBars: !synthSettings.arp.fillEmptyBars,
+                  },
+                })
+              }
+              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition ${
+                synthSettings.arp.fillEmptyBars
+                  ? 'bg-orange-500/15 border-orange-500/50 text-orange-400'
+                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+              }`}
+            >
+              <span className="text-left">Fill Empty Bars (Arp Only)</span>
+              <span
+                className={`px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase shrink-0 ${
+                  synthSettings.arp.fillEmptyBars
+                    ? 'bg-orange-500 text-[#1F1206]'
+                    : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]'
+                }`}
+              >
+                {synthSettings.arp.fillEmptyBars ? 'ON' : 'OFF'}
+              </span>
+            </button>
           </div>
         </div>
       </div>

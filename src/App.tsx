@@ -327,8 +327,8 @@ export default function App() {
         setPlayStartBarIndex(0);
         setPlayStartedAtServerTime(null);
       },
-      onPlaybackStart: (rawCtx) => {
-        synthEngineRef.current?.onPlaybackStart(rawCtx);
+      onPlaybackStart: (rawCtx, seedChord) => {
+        synthEngineRef.current?.onPlaybackStart(rawCtx, seedChord);
       },
       onChordSchedule: (ev) => {
         synthEngineRef.current?.scheduleChord(ev);
