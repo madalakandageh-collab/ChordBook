@@ -35,13 +35,14 @@ import {
 } from './SectionMultiPadModal';
 import { SynthBackingTab } from './SynthBackingTab';
 import {
+  copyTextToClipboard,
+  createSongJsonTemplate,
   formatBarChordsSummary,
   formatLastBarCuePassPrintBadge,
   formatPassOrdinal,
   getSongTotalBars,
   hasBeatSplits,
   parseMeterBeats,
-  SONG_JSON_TEMPLATE,
   transposeKey,
 } from '../utils/chords';
 
@@ -144,17 +145,12 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
   };
 
   const handleCopyJsonTemplate = async () => {
-    try {
-      await navigator.clipboard.writeText(SONG_JSON_TEMPLATE);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = SONG_JSON_TEMPLATE;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    }
-    showToast('Song JSON Template copied to clipboard');
+    const ok = await copyTextToClipboard(createSongJsonTemplate());
+    showToast(
+      ok
+        ? 'Song JSON Template copied to clipboard'
+        : 'Clipboard blocked by browser — try HTTPS'
+    );
   };
 
   const activeBarRef = useRef<HTMLButtonElement | null>(null);

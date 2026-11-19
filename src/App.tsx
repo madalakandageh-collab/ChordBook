@@ -21,7 +21,11 @@ import {
   DEFAULT_SECTION_SYNTH,
 } from './audio/synthEngine';
 import { SectionLayerModal, type SectionLayerType } from './components/SectionMultiPadModal';
-import { SheetsHomeScreen, type ImportedJsonPayload } from './components/SheetsHomeScreen';
+import {
+  SheetsHomeScreen,
+  type ImportedJsonPayload,
+  type ImportMergeSummary,
+} from './components/SheetsHomeScreen';
 import { SimpleMemberView } from './components/SimpleMemberView';
 import { TopBar } from './components/TopBar';
 import { INITIAL_SETLISTS, INITIAL_SONGS } from './data/initialSongs';
@@ -49,6 +53,8 @@ import {
   getGlobalDisplayBarNumber,
   normalizeSong,
   normalizeSongsList,
+  sanitizeSetlistForLightweightJson,
+  sanitizeSongForLightweightJson,
 } from './utils/chords';
 import {
   exportCustomVoiceCuesAsBase64,
@@ -103,6 +109,9 @@ export default function App() {
       INITIAL_SONGS
     )
   );
+  const songsRef = useRef<Song[]>(songs);
+  songsRef.current = songs;
+
   const [setlists, setSetlists] = useState<Setlist[]>(() =>
     loadFromStorage<Setlist[]>(STORAGE_KEYS.setlists, INITIAL_SETLISTS)
   );
@@ -439,83 +448,155 @@ export default function App() {
     setHasUnsavedChanges(false);
   }, [songs]);
 
-  const downloadJsonFile = (payload: unknown, filename: string) => {
-    const json = JSON.stringify(payload, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const downloadJsonFile = (payload: unknown, filename: string): boolean => {
+    try {
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.rel = 'noopener';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      window.setTimeout(() => {
+        if (a.parentNode) {
+          a.parentNode.removeChild(a);
+        }
+      }, 250);
+      // Keep blob URL alive long enough for iOS Safari / mobile download managers to finish reading
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return true;
+    } catch {
+      return false;
+    }
   };
 
-  const handleExportLightweightJson = useCallback(() => {
-    downloadJsonFile(
-      { songs, setlists },
+  const handleExportLightweightJson = useCallback((): boolean => {
+    return downloadJsonFile(
+      {
+        songs: songs.map(sanitizeSongForLightweightJson),
+        setlists: setlists.map(sanitizeSetlistForLightweightJson),
+      },
       `chordbook-sheets-${new Date().toISOString().slice(0, 10)}.json`
     );
   }, [songs, setlists]);
 
-  const handleExportFullBackupJson = useCallback(async () => {
+  const handleExportFullBackupJson = useCallback(async (): Promise<boolean> => {
     const customVoiceCues = await exportCustomVoiceCuesAsBase64();
-    downloadJsonFile(
-      { songs, setlists, customVoiceCues },
+    return downloadJsonFile(
+      {
+        songs: songs.map(sanitizeSongForLightweightJson),
+        setlists: setlists.map(sanitizeSetlistForLightweightJson),
+        customVoiceCues,
+      },
       `chordbook-full-backup-${new Date().toISOString().slice(0, 10)}.json`
     );
   }, [songs, setlists]);
 
   const handleExportSetlistJson = useCallback(
-    (setlistId: string) => {
+    (setlistId: string): boolean => {
       const target = setlists.find((sl) => sl.id === setlistId);
-      if (!target) return;
-      const setlistSongs = target.songIds
-        .map((id) => songs.find((s) => s.id === id))
-        .filter((s): s is Song => Boolean(s));
+      if (!target) return false;
+      const seenIds = new Set<string>();
+      const setlistSongs: Song[] = [];
+      for (const id of target.songIds || []) {
+        if (seenIds.has(id)) continue;
+        const found = songs.find((s) => s.id === id);
+        if (found) {
+          seenIds.add(id);
+          setlistSongs.push(sanitizeSongForLightweightJson(found));
+        }
+      }
       const slug =
         target.name
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/^-|-$/g, '') || 'setlist';
-      downloadJsonFile({ setlist: target, songs: setlistSongs }, `${slug}-setlist.json`);
+      return downloadJsonFile(
+        { setlist: sanitizeSetlistForLightweightJson(target), songs: setlistSongs },
+        `${slug}-setlist.json`
+      );
     },
     [setlists, songs]
   );
 
   const handleImportJson = useCallback(
-    async (data: ImportedJsonPayload) => {
+    async (data: ImportedJsonPayload): Promise<ImportMergeSummary> => {
+      const summary: ImportMergeSummary = {
+        songsAdded: 0,
+        songsUpdated: 0,
+        setlistsAdded: 0,
+        setlistsUpdated: 0,
+        cuesImported: 0,
+      };
+
       const songIdMap = new Map<string, string>();
+      const songTitleMap = new Map<string, string>();
+
+      const currentSongs = songsRef.current;
+      for (const existing of currentSongs) {
+        songTitleMap.set(existing.title.trim().toLowerCase(), existing.id);
+      }
 
       if (data.songs && Array.isArray(data.songs)) {
-        const mergedSongs = [...songs];
+        const mergedSongs = [...currentSongs];
         for (const raw of data.songs) {
-          if (!raw || !raw.title) continue;
-          const incomingId =
-            raw.id ||
-            `song-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-          const normalizedTitle = raw.title.trim().toLowerCase();
+          if (!raw || typeof raw !== 'object' || typeof raw.title !== 'string') continue;
+          const cleanTitle = raw.title.trim();
+          if (!cleanTitle) continue;
 
-          const matchIdx = mergedSongs.findIndex(
-            (x) => x.id === incomingId || x.title.trim().toLowerCase() === normalizedTitle
-          );
+          const normalizedTitle = cleanTitle.toLowerCase();
+          const rawId = typeof raw.id === 'string' ? raw.id.trim() : '';
+          const isTemplatePlaceholderId = !rawId || rawId === 'song-custom-template';
+
+          const matchIdx = mergedSongs.findIndex((x) => {
+            if (!isTemplatePlaceholderId && x.id === rawId) return true;
+            return x.title.trim().toLowerCase() === normalizedTitle;
+          });
+
+          const resolvedId =
+            matchIdx >= 0
+              ? mergedSongs[matchIdx].id
+              : !isTemplatePlaceholderId && !mergedSongs.some((x) => x.id === rawId)
+              ? rawId
+              : `song-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
           const normalizedSong = normalizeSong({
             ...raw,
-            id: matchIdx >= 0 ? mergedSongs[matchIdx].id : incomingId,
-            title: raw.title.trim(),
+            id: resolvedId,
+            title: cleanTitle,
+            sections: Array.isArray(raw.sections)
+              ? raw.sections
+              : matchIdx >= 0
+              ? mergedSongs[matchIdx].sections
+              : [],
+            lyrics: Array.isArray(raw.lyrics)
+              ? raw.lyrics
+              : matchIdx >= 0
+              ? mergedSongs[matchIdx].lyrics
+              : [],
             updatedAt: Date.now(),
           });
 
-          songIdMap.set(incomingId, normalizedSong.id);
+          if (rawId) {
+            songIdMap.set(rawId, normalizedSong.id);
+          }
+          songTitleMap.set(normalizedTitle, normalizedSong.id);
+
           if (matchIdx >= 0) {
             mergedSongs[matchIdx] = normalizedSong;
+            summary.songsUpdated += 1;
           } else {
             mergedSongs.push(normalizedSong);
+            summary.songsAdded += 1;
           }
         }
-        setSongs(mergedSongs);
+        if (summary.songsAdded > 0 || summary.songsUpdated > 0) {
+          songsRef.current = mergedSongs;
+          setSongs(mergedSongs);
+        }
       }
 
       const incomingSetlists: Setlist[] = [];
@@ -527,46 +608,66 @@ export default function App() {
       }
 
       if (incomingSetlists.length > 0) {
-        setSetlists((prev) => {
-          const merged = [...prev];
-          for (const sl of incomingSetlists) {
-            if (!sl || !sl.name) continue;
-            const incomingSlId = sl.id || `setlist-${Date.now().toString(36)}`;
-            const normalizedName = sl.name.trim().toLowerCase();
-            const remappedSongIds = Array.from(
-              new Set((sl.songIds || []).map((id) => songIdMap.get(id) || id))
-            );
+        const nextSetlists: Setlist[] = [...setlists];
+        for (const sl of incomingSetlists) {
+          if (!sl || typeof sl !== 'object' || typeof sl.name !== 'string') continue;
+          const cleanName = sl.name.trim();
+          if (!cleanName) continue;
 
-            const matchIdx = merged.findIndex(
-              (x) => x.id === incomingSlId || x.name.trim().toLowerCase() === normalizedName
-            );
+          const incomingSlId =
+            typeof sl.id === 'string' && sl.id.trim()
+              ? sl.id.trim()
+              : `setlist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+          const normalizedName = cleanName.toLowerCase();
 
-            if (matchIdx >= 0) {
-              const existing = merged[matchIdx];
-              const combinedIds = Array.from(new Set([...existing.songIds, ...remappedSongIds]));
-              merged[matchIdx] = { ...existing, songIds: combinedIds };
-            } else {
-              merged.push({
-                id: incomingSlId,
-                name: sl.name.trim(),
-                songIds: remappedSongIds,
-                createdAt: sl.createdAt || Date.now(),
-              });
-            }
+          const rawIds = Array.isArray(sl.songIds) ? sl.songIds : [];
+          const remappedSongIds = Array.from(
+            new Set(
+              rawIds
+                .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+                .map((id) => songIdMap.get(id) || songTitleMap.get(id.trim().toLowerCase()) || id)
+            )
+          );
+
+          const matchIdx = nextSetlists.findIndex(
+            (x) => x.id === incomingSlId || x.name.trim().toLowerCase() === normalizedName
+          );
+
+          if (matchIdx >= 0) {
+            const existing = nextSetlists[matchIdx];
+            const combinedIds = Array.from(new Set([...existing.songIds, ...remappedSongIds]));
+            nextSetlists[matchIdx] = { ...existing, songIds: combinedIds };
+            summary.setlistsUpdated += 1;
+          } else {
+            nextSetlists.push({
+              id: incomingSlId,
+              name: cleanName,
+              songIds: remappedSongIds,
+              createdAt: typeof sl.createdAt === 'number' ? sl.createdAt : Date.now(),
+            });
+            summary.setlistsAdded += 1;
           }
-          return merged;
-        });
+        }
+        if (summary.setlistsAdded > 0 || summary.setlistsUpdated > 0) {
+          setSetlists(nextSetlists);
+        }
       }
 
       if (data.customVoiceCues && Array.isArray(data.customVoiceCues)) {
-        await importCustomVoiceCuesFromBase64(data.customVoiceCues);
-        for (const cue of data.customVoiceCues) {
-          if (cue?.id) audioEngineRef.current?.invalidateCustomCueCache(cue.id);
+        const validCues = data.customVoiceCues.filter((c) => Boolean(c && c.id && c.audioBase64));
+        if (validCues.length > 0) {
+          await importCustomVoiceCuesFromBase64(validCues);
+          for (const cue of validCues) {
+            if (cue?.id) audioEngineRef.current?.invalidateCustomCueCache(cue.id);
+          }
+          summary.cuesImported = validCues.length;
+          setCueLibraryVersion((v) => v + 1);
         }
-        setCueLibraryVersion((v) => v + 1);
       }
+
+      return summary;
     },
-    [songs]
+    [setlists]
   );
 
   // Dedicated Member Mode or Preview Member App
@@ -837,7 +938,10 @@ export default function App() {
                 .toLowerCase()
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/^-|-$/g, '') || 'chordbook-project';
-            downloadJsonFile({ songs: [activeSong], setlists: [] }, `${slug}-project.json`);
+            downloadJsonFile(
+              { songs: [sanitizeSongForLightweightJson(activeSong)], setlists: [] },
+              `${slug}-project.json`
+            );
           }}
           onUpdateSongMeta={(title, artist, key) => {
             if (isLocked) return;

@@ -1,4 +1,4 @@
-import type { Bar, BarMeter, LastBarCuePassRule, Section, Song, TimelineBar } from '../types';
+import type { Bar, BarMeter, LastBarCuePassRule, Section, Setlist, Song, TimelineBar } from '../types';
 
 const SHARP_SCALE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FLAT_SCALE = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -339,56 +339,108 @@ export function chordToMidiNotes(chordStr: string, semitones = 0): number[] {
 export function normalizeSection(raw: Partial<Section> | null | undefined, idx = 0): Section {
   const safe = raw && typeof raw === 'object' ? raw : {};
   const rawBars: unknown[] = Array.isArray(safe.bars) ? safe.bars : [];
-  const bars: Bar[] = rawBars
-    .filter((b): b is Partial<Bar> => Boolean(b && typeof b === 'object'))
-    .map((b, bIdx) => ({
+  const bars: Bar[] = [];
+
+  for (let bIdx = 0; bIdx < rawBars.length; bIdx++) {
+    const item = rawBars[bIdx];
+    if (typeof item === 'string') {
+      const chordVal = item.trim() || '-';
+      bars.push({
+        id: `bar-${idx}-${bIdx}-${Math.random().toString(36).slice(2, 6)}`,
+        chord: chordVal,
+        repeat: 1,
+      });
+      continue;
+    }
+    if (!item || typeof item !== 'object') continue;
+    const b = item as Partial<Bar>;
+    const parsedRepeat = Number(b.repeat);
+    const parsedTempo = b.tempo !== undefined ? Number(b.tempo) : NaN;
+    const cleanBeatChords = Array.isArray(b.beatChords)
+      ? b.beatChords.map((c) => (typeof c === 'string' ? c : ''))
+      : undefined;
+
+    bars.push({
       ...b,
-      id: typeof b.id === 'string' && b.id ? b.id : `bar-${idx}-${bIdx}-${Math.random().toString(36).slice(2, 6)}`,
-      chord: typeof b.chord === 'string' ? b.chord : '-',
-      repeat: typeof b.repeat === 'number' && b.repeat > 0 ? b.repeat : 1,
-    }));
+      id:
+        typeof b.id === 'string' && b.id.trim()
+          ? b.id.trim()
+          : `bar-${idx}-${bIdx}-${Math.random().toString(36).slice(2, 6)}`,
+      chord: typeof b.chord === 'string' && b.chord.trim() ? b.chord.trim() : '-',
+      beatChords: cleanBeatChords,
+      tempo:
+        Number.isFinite(parsedTempo) && parsedTempo >= 20 && parsedTempo <= 300
+          ? parsedTempo
+          : undefined,
+      repeat: Number.isFinite(parsedRepeat) && parsedRepeat >= 1 ? Math.round(parsedRepeat) : 1,
+    });
+  }
 
   return {
     ...safe,
-    id: typeof safe.id === 'string' && safe.id ? safe.id : `sec-${idx}-${Math.random().toString(36).slice(2, 6)}`,
-    name: typeof safe.name === 'string' && safe.name.trim() ? safe.name : `Section ${idx + 1}`,
+    id:
+      typeof safe.id === 'string' && safe.id.trim()
+        ? safe.id.trim()
+        : `sec-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+    name: typeof safe.name === 'string' && safe.name.trim() ? safe.name.trim() : `Section ${idx + 1}`,
     bars,
   };
 }
 
 export function normalizeSong(raw: Partial<Song> | null | undefined, fallbackIdx = 0): Song {
-  const safe = raw && typeof raw === 'object' ? raw : {};
-  const rawSections: unknown[] = Array.isArray(safe.sections) ? safe.sections : [];
+  const safe = (raw && typeof raw === 'object' ? raw : {}) as Partial<Song> & { bars?: unknown[] };
+  let rawSections: unknown[] = Array.isArray(safe.sections) ? safe.sections : [];
+  if (rawSections.length === 0 && Array.isArray(safe.bars) && safe.bars.length > 0) {
+    rawSections = [{ id: `sec-main-${fallbackIdx}`, name: 'Main', bars: safe.bars }];
+  }
   const sections = rawSections
     .filter((sec): sec is Partial<Section> => Boolean(sec && typeof sec === 'object'))
     .map((sec, idx) => normalizeSection(sec, idx));
 
-  const rawLyrics = Array.isArray(safe.lyrics) ? safe.lyrics : [];
+  const rawLyrics: unknown[] = Array.isArray(safe.lyrics) ? safe.lyrics : [];
   const lyrics = rawLyrics
-    .filter((l) => Boolean(l && typeof l === 'object'))
+    .filter((l): l is { id?: unknown; label?: unknown; lines?: unknown } => Boolean(l && typeof l === 'object'))
     .map((l, idx) => ({
-      id: typeof l.id === 'string' && l.id ? l.id : `lyr-${idx}-${Math.random().toString(36).slice(2, 6)}`,
-      label: typeof l.label === 'string' ? l.label : `Section ${idx + 1}`,
-      lines: Array.isArray(l.lines) ? l.lines.map((line) => String(line ?? '')) : [],
+      id:
+        typeof l.id === 'string' && l.id.trim()
+          ? l.id.trim()
+          : `lyr-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+      label: typeof l.label === 'string' && l.label.trim() ? l.label.trim() : `Section ${idx + 1}`,
+      lines: Array.isArray(l.lines)
+        ? l.lines.map((line) => String(line ?? ''))
+        : typeof l.lines === 'string'
+        ? l.lines.split(/\r?\n/)
+        : [],
     }));
+
+  const parsedBpm = Number(safe.bpm);
+  const parsedTranspose = Number(safe.transpose);
+  const parsedUpdatedAt = Number(safe.updatedAt);
 
   return {
     id:
-      typeof safe.id === 'string' && safe.id
-        ? safe.id
+      typeof safe.id === 'string' && safe.id.trim()
+        ? safe.id.trim()
         : `song-${fallbackIdx}-${Math.random().toString(36).slice(2, 7)}`,
     title: typeof safe.title === 'string' && safe.title.trim() ? safe.title.trim() : 'Untitled Song',
     artist: typeof safe.artist === 'string' && safe.artist.trim() ? safe.artist.trim() : 'Unknown Artist',
     key: typeof safe.key === 'string' && safe.key.trim() ? safe.key.trim() : 'C',
-    bpm: typeof safe.bpm === 'number' && Number.isFinite(safe.bpm) && safe.bpm > 0 ? safe.bpm : 92,
+    bpm:
+      Number.isFinite(parsedBpm) && parsedBpm >= 20 && parsedBpm <= 300
+        ? Math.round(parsedBpm)
+        : 92,
     timeSignature:
       safe.timeSignature === '3/4' || safe.timeSignature === '6/8' || safe.timeSignature === '4/4'
         ? safe.timeSignature
         : '4/4',
-    transpose: typeof safe.transpose === 'number' && Number.isFinite(safe.transpose) ? safe.transpose : 0,
+    transpose:
+      Number.isFinite(parsedTranspose)
+        ? Math.max(-11, Math.min(11, Math.round(parsedTranspose)))
+        : 0,
     sections,
     lyrics,
-    updatedAt: typeof safe.updatedAt === 'number' && Number.isFinite(safe.updatedAt) ? safe.updatedAt : Date.now(),
+    updatedAt:
+      Number.isFinite(parsedUpdatedAt) && parsedUpdatedAt > 0 ? parsedUpdatedAt : Date.now(),
   };
 }
 
@@ -428,9 +480,69 @@ export function formatBarChordsSummary(bar: Bar, semitones = 0, targetKey?: stri
   return formatChordDisplay(transposeChord(bar.chord, semitones, targetKey));
 }
 
-export const SONG_JSON_TEMPLATE = JSON.stringify(
-  {
-    id: 'song-custom-template',
+export function sanitizeSongForLightweightJson(song: Song): Song {
+  const normalized = normalizeSong(song);
+  return {
+    id: normalized.id,
+    title: normalized.title,
+    artist: normalized.artist,
+    key: normalized.key,
+    bpm: normalized.bpm,
+    timeSignature: normalized.timeSignature,
+    transpose: normalized.transpose,
+    sections: normalized.sections.map((sec) => ({
+      id: sec.id,
+      name: sec.name,
+      bars: sec.bars.map((bar) => {
+        const cleanBar: Bar = {
+          id: bar.id,
+          chord: bar.chord,
+        };
+        if (bar.beatChords) cleanBar.beatChords = [...bar.beatChords];
+        if (bar.lyrics) cleanBar.lyrics = bar.lyrics;
+        if (bar.meter) cleanBar.meter = bar.meter;
+        if (bar.tempo !== undefined) cleanBar.tempo = bar.tempo;
+        if (bar.beatUnit) cleanBar.beatUnit = bar.beatUnit;
+        if (bar.cue) cleanBar.cue = bar.cue;
+        if (bar.customCueId) cleanBar.customCueId = bar.customCueId;
+        if (bar.voiceCountLocked) cleanBar.voiceCountLocked = bar.voiceCountLocked;
+        if (bar.countingSystem) cleanBar.countingSystem = bar.countingSystem;
+        if (bar.repeat && bar.repeat > 1) cleanBar.repeat = bar.repeat;
+        return cleanBar;
+      }),
+      ...(sec.transpose !== undefined ? { transpose: sec.transpose } : {}),
+      ...(sec.repeat !== undefined ? { repeat: sec.repeat } : {}),
+      ...(sec.repeatCount !== undefined ? { repeatCount: sec.repeatCount } : {}),
+      ...(sec.lastBarCuePassRule !== undefined
+        ? { lastBarCuePassRule: sec.lastBarCuePassRule }
+        : {}),
+      ...(sec.isReference !== undefined ? { isReference: sec.isReference } : {}),
+      ...(sec.referenceTargetId ? { referenceTargetId: sec.referenceTargetId } : {}),
+      ...(sec.multiPad ? { multiPad: { ...sec.multiPad } } : {}),
+      ...(sec.synth ? { synth: { ...sec.synth } } : {}),
+      ...(sec.arp ? { arp: { ...sec.arp } } : {}),
+    })),
+    lyrics: normalized.lyrics.map((l) => ({
+      id: l.id,
+      label: l.label,
+      lines: [...l.lines],
+    })),
+    updatedAt: normalized.updatedAt,
+  };
+}
+
+export function sanitizeSetlistForLightweightJson(setlist: Setlist): Setlist {
+  return {
+    id: setlist.id,
+    name: setlist.name,
+    songIds: Array.isArray(setlist.songIds) ? [...setlist.songIds] : [],
+    createdAt: typeof setlist.createdAt === 'number' ? setlist.createdAt : Date.now(),
+  };
+}
+
+export function buildSongTemplateObject(songId = 'song-custom-template'): Omit<Song, 'updatedAt'> {
+  return {
+    id: songId,
     title: 'My New Song',
     artist: 'Artist Name',
     key: 'G',
@@ -466,9 +578,65 @@ export const SONG_JSON_TEMPLATE = JSON.stringify(
         lines: ['First line of lyrics', 'Second line of lyrics'],
       },
     ],
-  },
-  null,
-  2
-);
+  };
+}
+
+export function createSongJsonTemplate(): string {
+  const uniqueId = `song-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  return JSON.stringify(buildSongTemplateObject(uniqueId), null, 2);
+}
+
+export const SONG_JSON_TEMPLATE = JSON.stringify(buildSongTemplateObject(), null, 2);
+
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fall through to execCommand fallback (needed on iOS Safari / embedded iframes)
+    }
+  }
+
+  if (typeof document === 'undefined') return false;
+
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.top = '0';
+  ta.style.left = '0';
+  ta.style.width = '2em';
+  ta.style.height = '2em';
+  ta.style.padding = '0';
+  ta.style.border = 'none';
+  ta.style.outline = 'none';
+  ta.style.boxShadow = 'none';
+  ta.style.background = 'transparent';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+
+  try {
+    ta.focus({ preventScroll: true });
+  } catch {
+    ta.focus();
+  }
+  ta.select();
+  try {
+    ta.setSelectionRange(0, text.length);
+  } catch {
+    // Ignore on non-supporting browsers
+  }
+
+  let copied = false;
+  try {
+    copied = document.execCommand('copy');
+  } catch {
+    copied = false;
+  } finally {
+    document.body.removeChild(ta);
+  }
+  return copied;
+}
 
 export { SHARP_SCALE, FLAT_SCALE };

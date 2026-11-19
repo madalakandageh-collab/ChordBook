@@ -17,17 +17,27 @@ import {
 } from 'lucide-react';
 import type { SerializedVoiceCue, Setlist, Song } from '../types';
 import {
-  SONG_JSON_TEMPLATE,
+  copyTextToClipboard,
   createEmptyBar,
+  createSongJsonTemplate,
   getSongTotalBars,
   transposeKey,
 } from '../utils/chords';
 
 export interface ImportedJsonPayload {
   songs?: Song[];
+  song?: Song;
   setlists?: Setlist[];
   setlist?: Setlist;
   customVoiceCues?: SerializedVoiceCue[];
+}
+
+export interface ImportMergeSummary {
+  songsAdded: number;
+  songsUpdated: number;
+  setlistsAdded: number;
+  setlistsUpdated: number;
+  cuesImported: number;
 }
 
 interface SheetsHomeScreenProps {
@@ -41,10 +51,10 @@ interface SheetsHomeScreenProps {
   onAddSongToSetlist: (setlistId: string, songId: string) => void;
   onRemoveSongFromSetlist: (setlistId: string, songId: string) => void;
   onPlaySongFromSetlist: (songId: string) => void;
-  onImportJson: (data: ImportedJsonPayload) => void | Promise<void>;
-  onExportLightweightJson: () => void;
-  onExportFullBackupJson: () => void | Promise<void>;
-  onExportSetlistJson: (setlistId: string) => void;
+  onImportJson: (data: ImportedJsonPayload) => ImportMergeSummary | Promise<ImportMergeSummary>;
+  onExportLightweightJson: () => boolean;
+  onExportFullBackupJson: () => boolean | Promise<boolean>;
+  onExportSetlistJson: (setlistId: string) => boolean;
 }
 
 export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
@@ -84,6 +94,18 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
   const [newSetlistName, setNewSetlistName] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const feedbackTimerRef = useRef<number | null>(null);
+
+  const showStatusFeedback = (msg: string, durationMs = 3400) => {
+    setImportFeedback(msg);
+    if (feedbackTimerRef.current !== null) {
+      window.clearTimeout(feedbackTimerRef.current);
+    }
+    feedbackTimerRef.current = window.setTimeout(() => {
+      setImportFeedback(null);
+      feedbackTimerRef.current = null;
+    }, durationMs);
+  };
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredSongs = songs.filter((song) => {
@@ -102,53 +124,96 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
   });
 
   const handleCopySongTemplate = async () => {
-    try {
-      await navigator.clipboard.writeText(SONG_JSON_TEMPLATE);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = SONG_JSON_TEMPLATE;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
+    const ok = await copyTextToClipboard(createSongJsonTemplate());
+    if (ok) {
+      setCopiedTemplate(true);
+      setTimeout(() => setCopiedTemplate(false), 2400);
+    } else {
+      showStatusFeedback('Clipboard blocked by browser — try HTTPS or Export JSON');
     }
-    setCopiedTemplate(true);
-    setTimeout(() => setCopiedTemplate(false), 2400);
   };
 
   const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
+    reader.onerror = () => {
+      showStatusFeedback('Could not read selected file');
+    };
     reader.onload = async () => {
       try {
-        const parsed = JSON.parse(String(reader.result));
+        const rawText = String(reader.result ?? '')
+          .replace(/^\uFEFF/, '')
+          .trim();
+        if (!rawText) {
+          showStatusFeedback('Selected JSON file is empty');
+          return;
+        }
+        const parsed = JSON.parse(rawText);
+
+        let payload: ImportedJsonPayload | null = null;
         if (Array.isArray(parsed)) {
-          await onImportJson({ songs: parsed as Song[] });
-          setImportFeedback(`Merged ${parsed.length} ${parsed.length === 1 ? 'song' : 'songs'}`);
+          payload = { songs: parsed as Song[] };
         } else if (parsed && typeof parsed === 'object') {
-          const obj = parsed as ImportedJsonPayload & Partial<Song>;
-          if (!obj.songs && !obj.setlists && !obj.setlist && obj.title && Array.isArray(obj.sections)) {
-            await onImportJson({ songs: [obj as Song] });
-            setImportFeedback(`Merged song "${obj.title}"`);
+          const obj = parsed as ImportedJsonPayload & Partial<Song> & Partial<Setlist>;
+          if (
+            !obj.songs &&
+            !obj.setlists &&
+            !obj.setlist &&
+            !obj.song &&
+            typeof obj.title === 'string' &&
+            obj.title.trim().length > 0
+          ) {
+            payload = { songs: [obj as Song] };
+          } else if (
+            !obj.songs &&
+            !obj.setlists &&
+            !obj.setlist &&
+            !obj.song &&
+            typeof obj.name === 'string' &&
+            obj.name.trim().length > 0 &&
+            Array.isArray(obj.songIds)
+          ) {
+            payload = { setlist: obj as Setlist };
           } else {
-            await onImportJson(obj);
-            const parts: string[] = [];
-            if (obj.songs?.length) parts.push(`${obj.songs.length} songs`);
-            if (obj.setlist) parts.push(`setlist "${obj.setlist.name}"`);
-            if (obj.setlists?.length) parts.push(`${obj.setlists.length} setlists`);
-            if (obj.customVoiceCues?.length) parts.push(`${obj.customVoiceCues.length} voice cues`);
-            setImportFeedback(
-              parts.length ? `Merged ${parts.join(', ')}` : 'JSON imported'
-            );
+            payload = {
+              ...obj,
+              songs: obj.song ? [obj.song, ...(Array.isArray(obj.songs) ? obj.songs : [])] : obj.songs,
+            };
           }
         }
+
+        if (!payload) {
+          showStatusFeedback('Unrecognized JSON format');
+          return;
+        }
+
+        const summary = await onImportJson(payload);
+        const totalSongs = summary.songsAdded + summary.songsUpdated;
+        const totalSetlists = summary.setlistsAdded + summary.setlistsUpdated;
+        const parts: string[] = [];
+        if (totalSongs > 0) {
+          parts.push(`${totalSongs} ${totalSongs === 1 ? 'song' : 'songs'}`);
+        }
+        if (totalSetlists > 0) {
+          parts.push(`${totalSetlists} ${totalSetlists === 1 ? 'setlist' : 'setlists'}`);
+        }
+        if (summary.cuesImported > 0) {
+          parts.push(
+            `${summary.cuesImported} ${summary.cuesImported === 1 ? 'voice cue' : 'voice cues'}`
+          );
+        }
+
+        showStatusFeedback(
+          parts.length > 0
+            ? `Merged ${parts.join(', ')}`
+            : 'No valid songs or setlists found in JSON'
+        );
       } catch {
-        setImportFeedback('Invalid JSON file');
+        showStatusFeedback('Invalid JSON file — check syntax and commas');
       }
-      setTimeout(() => setImportFeedback(null), 3200);
     };
-    reader.readAsText(file);
+    reader.readAsText(file, 'utf-8');
     e.target.value = '';
   };
 
@@ -218,9 +283,9 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".json,application/json"
+            accept=".json,application/json,text/json,text/plain,.txt"
             onChange={handleFileImport}
-            className="hidden"
+            className="sr-only"
           />
           <button
             type="button"
@@ -253,7 +318,12 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                   type="button"
                   onClick={() => {
                     setShowExportMenu(false);
-                    onExportLightweightJson();
+                    const ok = onExportLightweightJson();
+                    if (ok) {
+                      showStatusFeedback(
+                        `Exported ${songs.length} ${songs.length === 1 ? 'song' : 'songs'} & ${setlists.length} ${setlists.length === 1 ? 'setlist' : 'setlists'} (Lightweight JSON)`
+                      );
+                    }
                   }}
                   className="w-full px-3.5 py-2.5 rounded-xl text-left hover:bg-[var(--bg-elevated)] flex items-start gap-2.5 transition"
                 >
@@ -269,9 +339,12 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     setShowExportMenu(false);
-                    void onExportFullBackupJson();
+                    const ok = await onExportFullBackupJson();
+                    if (ok) {
+                      showStatusFeedback('Exported Full Backup JSON (with custom audio)');
+                    }
                   }}
                   className="w-full px-3.5 py-2.5 rounded-xl text-left hover:bg-[var(--bg-elevated)] flex items-start gap-2.5 transition"
                 >
@@ -492,7 +565,14 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
 
                         <button
                           type="button"
-                          onClick={() => onExportSetlistJson(setlist.id)}
+                          onClick={() => {
+                            const ok = onExportSetlistJson(setlist.id);
+                            if (ok) {
+                              showStatusFeedback(
+                                `Exported setlist "${setlist.name}" (${setlistSongs.length} ${setlistSongs.length === 1 ? 'song' : 'songs'})`
+                              );
+                            }
+                          }}
                           title={`Export ${setlist.name} JSON`}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] transition"
                         >
