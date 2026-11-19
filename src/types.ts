@@ -54,6 +54,49 @@ export interface SerializedVoiceCue {
 
 export type LastBarCuePassRule = 'all' | 'first' | 'last' | number;
 
+export type SectionPadPattern =
+  | 'Sustain'
+  | 'Pulse'
+  | 'Swell'
+  | 'Octave Drone'
+  | 'Rhythmic Gate';
+
+export type SectionSynthPattern =
+  | 'Full Chord'
+  | 'Stabs'
+  | 'Off-Beat Comp'
+  | 'Bass Root Focus';
+
+export type BarRangeMode = 'all' | 'custom';
+
+export interface SectionMultiPadConfig {
+  enabled: boolean;
+  pattern: SectionPadPattern;
+  tone: PadPresetId;
+  barRangeMode?: BarRangeMode;
+  startBar?: number;
+  endBar?: number;
+}
+
+export interface SectionSynthConfig {
+  enabled: boolean;
+  pattern: SectionSynthPattern;
+  tone: SynthPresetId;
+  barRangeMode?: BarRangeMode;
+  startBar?: number;
+  endBar?: number;
+}
+
+export interface SectionArpConfig {
+  enabled: boolean;
+  pattern: ArpPatternType;
+  tone: ArpPresetId;
+  subdivision?: '8n' | '16n' | '4n' | '8t';
+  barRangeMode?: BarRangeMode;
+  startBar?: number;
+  endBar?: number;
+}
+
 export interface Section {
   id: string;
   name: string;
@@ -64,6 +107,9 @@ export interface Section {
   lastBarCuePassRule?: LastBarCuePassRule; // default 'all'
   isReference?: boolean;
   referenceTargetId?: string;
+  multiPad?: SectionMultiPadConfig;
+  synth?: SectionSynthConfig;
+  arp?: SectionArpConfig;
 }
 
 export interface LyricSection {
@@ -138,6 +184,8 @@ export interface TimelineBar {
   displayBarNumber: number; // 1-based bar index in song
   sectionId: string;
   sectionName: string;
+  sectionBarNumber: number; // 1-based bar index within the section
+  sectionTotalBars: number; // total expanded bars in the section
   barId: string;
   bar: Bar;
   repeatIteration: number;
@@ -150,4 +198,100 @@ export interface TimelineBar {
   sectionTotalPasses?: number;
   isLastBarOfSection?: boolean;
   lastBarCuePassRule?: LastBarCuePassRule;
+  sectionMultiPad?: SectionMultiPadConfig;
+  sectionSynth?: SectionSynthConfig;
+  sectionArp?: SectionArpConfig;
 }
+
+export type SynthPresetId =
+  | 'FM Electric Piano'
+  | 'Wurli Reed Keys'
+  | 'Soft Pluck'
+  | 'Mute Nylon Pluck'
+  | 'Funk Clavinet'
+  | 'Classic Saw Lead'
+  | 'Warm Analog Polysynth'
+  | 'Brass Synth Stab'
+  | 'Detuned Supersaw'
+  | 'Retro 80s Poly'
+  | 'Crystal Bell'
+  | 'Celesta Sparkle'
+  | 'Sub Analog Bass'
+  | 'Punchy Synth Bass'
+  | 'FM Slap Bass'
+  | 'Staccato Strings'
+  | 'Choir Vox Hit'
+  | 'Gated Synth Chop';
+
+export type PadPresetId =
+  | 'Warm Analog Pad'
+  | 'Velvet Brass Pad'
+  | 'Golden Tape Pad'
+  | 'Soft Sub Pad'
+  | 'Creamy Juno Chorus Pad'
+  | 'Lush String Pad'
+  | 'Chamber Strings'
+  | 'Ethereal Angel Choir'
+  | 'Cathedral Boys Choir'
+  | 'Cinematic String Swell'
+  | 'Deep Space Pad'
+  | 'Shimmer Halo Pad'
+  | 'Glassy Horizon Texture'
+  | 'Rhythmic Gate Pad'
+  | 'Trance Sidechain Gate'
+  | 'Soft Organ Pad'
+  | 'Gospel B3 Swell'
+  | 'Harmonium Drone';
+
+export type ArpPresetId =
+  | 'Synth Pluck Arp'
+  | 'Acoustic Harp Arp'
+  | 'Electric Guitar Clean'
+  | 'Muted Strat Pluck'
+  | 'Warm Kalimbaphone'
+  | 'Soft Marimba'
+  | 'Vibraphone Bell'
+  | 'Music Box Chime'
+  | 'FM Tubular Bell'
+  | 'Glass Marimba'
+  | '8-Bit Retro'
+  | 'Acid 303 Saw Arp'
+  | 'Trance Supersaw Arp'
+  | 'Rhythmic Gate Pulse'
+  | 'FM Percussive Zap'
+  | 'Driving Bass Arp'
+  | 'Pizzicato String Arp'
+  | 'Ambient Dew Texture';
+
+export type ArpPatternType = 'up' | 'down' | 'upDown' | 'alternateUp' | 'random';
+
+export interface SynthLayerConfig {
+  preset?: SynthPresetId; // legacy optional field; per-section tone lives on Section.synth
+  volumeDb: number; // -36 to +6 dB
+  pan: number; // -1 to +1
+  muted: boolean;
+}
+
+export interface PadLayerConfig {
+  preset?: PadPresetId; // legacy optional field; per-section tone lives on Section.multiPad
+  volumeDb: number; // -36 to +6 dB
+  pan: number; // -1 to +1
+  muted: boolean;
+}
+
+export interface ArpLayerConfig {
+  preset?: ArpPresetId; // legacy optional field; per-section tone lives on Section.arp
+  pattern?: ArpPatternType;
+  volumeDb: number; // -36 to +6 dB
+  pan: number; // -1 to +1
+  muted: boolean;
+}
+
+export interface SynthBackingSettings {
+  masterEnabled: boolean;
+  synth: SynthLayerConfig;
+  pad: PadLayerConfig;
+  arp: ArpLayerConfig;
+}
+
+

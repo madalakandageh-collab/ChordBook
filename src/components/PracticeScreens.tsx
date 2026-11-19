@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowLeft, Lock, LockOpen, Repeat, Target } from 'lucide-react';
 import type { Song, TimelineBar } from '../types';
 import { formatBarChordsSummary, transposeKey } from '../utils/chords';
+import { SectionLayerDotsCluster, type SectionLayerType } from './SectionMultiPadModal';
 
 interface PracticeSelectScreenProps {
   songs: Song[];
@@ -86,6 +87,7 @@ interface PracticePlayerScreenProps {
   onLoopSectionChange: (sectionId: string | null) => void;
   onSectionTransposeChange: (sectionId: string, delta: number) => void;
   onSeekToBarIndex: (index: number) => void;
+  onOpenSectionLayer: (sectionId: string, layer: SectionLayerType) => void;
 }
 
 export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
@@ -105,6 +107,7 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
   onLoopSectionChange,
   onSectionTransposeChange,
   onSeekToBarIndex,
+  onOpenSectionLayer,
 }) => {
   const safeIndex = Math.max(0, Math.min(activeStepIndex, Math.max(0, timeline.length - 1)));
   const currentStep = timeline[safeIndex];
@@ -316,18 +319,27 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
               .map((sec) => {
                 const active = loopSectionId === sec.id;
                 return (
-                  <button
+                  <div
                     key={sec.id}
-                    type="button"
-                    onClick={() => onLoopSectionChange(sec.id)}
-                    className={`px-3.5 py-2 rounded-full border text-xs font-medium transition ${
+                    className={`inline-flex items-center gap-1.5 pl-3.5 pr-1.5 py-1 rounded-full border transition ${
                       active
                         ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
                         : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-primary)]/85 hover:text-[var(--text-primary)]'
                     }`}
                   >
-                    {sec.name}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => onLoopSectionChange(sec.id)}
+                      className="py-1 text-xs font-medium text-left"
+                    >
+                      {sec.name}
+                    </button>
+                    <SectionLayerDotsCluster
+                      section={sec}
+                      disabled={isLocked}
+                      onOpen={(layer) => onOpenSectionLayer(sec.id, layer)}
+                    />
+                  </div>
                 );
               })}
           </div>

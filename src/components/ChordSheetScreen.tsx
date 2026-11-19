@@ -15,10 +15,25 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import type { Bar, LastBarCuePassRule, LyricSection, Section, Song, TimeSignature } from '../types';
+import type {
+  Bar,
+  LastBarCuePassRule,
+  LyricSection,
+  MetronomeSettings,
+  Section,
+  Song,
+  SynthBackingSettings,
+  TimeSignature,
+} from '../types';
 import type { BarEditorMode } from './BarEditorModal';
 import { ArrangeSectionsModal } from './ArrangeSectionsModal';
 import { PrintableChordSheetModal } from './PrintableChordSheetModal';
+import {
+  formatLayerBarRangeLabel,
+  SectionLayerDotsCluster,
+  type SectionLayerType,
+} from './SectionMultiPadModal';
+import { SynthBackingTab } from './SynthBackingTab';
 import {
   formatBarChordsSummary,
   formatLastBarCuePassPrintBadge,
@@ -66,6 +81,11 @@ interface ChordSheetScreenProps {
   onUpdateSongMeta: (title: string, artist: string, key: string) => void;
   onUpdateLyrics: (lyrics: LyricSection[]) => void;
   onDeleteSong: () => void;
+  metronomeSettings: MetronomeSettings;
+  synthSettings: SynthBackingSettings;
+  onUpdateSynthSettings: (next: SynthBackingSettings) => void;
+  onSeekToBarId: (sectionId: string, barId: string) => void;
+  onOpenSectionLayer: (sectionId: string, layer: SectionLayerType) => void;
 }
 
 export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
@@ -96,8 +116,13 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
   onUpdateSongMeta,
   onUpdateLyrics,
   onDeleteSong,
+  metronomeSettings,
+  synthSettings,
+  onUpdateSynthSettings,
+  onSeekToBarId,
+  onOpenSectionLayer,
 }) => {
-  const [tab, setTab] = useState<'chords' | 'lyrics'>('chords');
+  const [tab, setTab] = useState<'chords' | 'synth' | 'lyrics'>('chords');
   const [showSongMenu, setShowSongMenu] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [activeSectionMenuId, setActiveSectionMenuId] = useState<string | null>(null);
@@ -440,33 +465,56 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
         </div>
       )}
 
-      {/* CHORDS | LYRICS Switcher */}
-      <div className="mt-5 p-1 rounded-full bg-[var(--bg-panel)] border border-[var(--border-subtle)] grid grid-cols-2 shadow-xs">
+      {/* Chord Sheet | Synth & Backing | Lyrics Switcher */}
+      <div className="mt-5 p-1 rounded-full bg-[var(--bg-panel)] border border-[var(--border-subtle)] grid grid-cols-3 gap-1 shadow-xs">
         <button
           type="button"
           onClick={() => setTab('chords')}
-          className={`py-2.5 rounded-full text-[13px] font-bold tracking-[0.14em] uppercase transition ${
+          className={`py-2.5 px-2 rounded-full text-[11px] sm:text-[13px] font-bold tracking-[0.08em] sm:tracking-[0.12em] uppercase transition whitespace-nowrap truncate ${
             tab === 'chords'
               ? 'bg-[#E5A958] text-[#121212]'
               : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
-          CHORDS
+          Chord Sheet
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('synth')}
+          className={`py-2.5 px-2 rounded-full text-[11px] sm:text-[13px] font-bold tracking-[0.06em] sm:tracking-[0.1em] uppercase transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap truncate ${
+            tab === 'synth'
+              ? 'bg-[#E5A958] text-[#121212]'
+              : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+          }`}
+        >
+          <span
+            aria-label={synthSettings.masterEnabled ? 'Synth active' : 'Synth off'}
+            className={`w-2 h-2 rounded-full shrink-0 ${
+              synthSettings.masterEnabled
+                ? tab === 'synth'
+                  ? 'bg-emerald-700'
+                  : 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]'
+                : tab === 'synth'
+                ? 'bg-[#121212]/40'
+                : 'bg-[var(--text-subtle)]'
+            }`}
+          />
+          <span className="truncate">Synth &amp; Backing</span>
         </button>
         <button
           type="button"
           onClick={() => setTab('lyrics')}
-          className={`py-2.5 rounded-full text-[13px] font-bold tracking-[0.14em] uppercase transition ${
+          className={`py-2.5 px-2 rounded-full text-[11px] sm:text-[13px] font-bold tracking-[0.08em] sm:tracking-[0.12em] uppercase transition whitespace-nowrap truncate ${
             tab === 'lyrics'
               ? 'bg-[#E5A958] text-[#121212]'
               : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
-          LYRICS
+          Lyrics
         </button>
       </div>
 
-      {/* CHORDS TAB */}
+      {/* CHORD SHEET TAB */}
       {tab === 'chords' ? (
         <div className="mt-5 space-y-4">
           {song.sections.map((section: Section) => {
@@ -544,13 +592,56 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-serif-display text-[22px] font-bold text-[var(--text-primary)]">
-                        {section.name}
-                      </h2>
+                      <div className="relative inline-flex items-center gap-2">
+                        <h2 className="font-serif-display text-[22px] font-bold text-[var(--text-primary)]">
+                          {section.name}
+                        </h2>
+                        <SectionLayerDotsCluster
+                          section={section}
+                          disabled={isLocked}
+                          onOpen={(layer) => onOpenSectionLayer(section.id, layer)}
+                        />
+                      </div>
                       {isRepeatOn && (
                         <span className="px-2 py-0.5 rounded-full bg-[var(--accent-amber-tint)] border border-[#E5A958]/60 text-[11px] font-bold text-[var(--accent-amber-text)] tabular-nums">
                           ||: :|| ×{repeatCount}
                         </span>
+                      )}
+                      {section.multiPad?.enabled && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenSectionLayer(section.id, 'pad');
+                          }}
+                          className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/45 text-[10px] font-semibold text-emerald-400 hover:bg-emerald-500/25 transition"
+                        >
+                          Pad: {section.multiPad.tone} · {formatLayerBarRangeLabel(section.multiPad, secBarCount)}
+                        </button>
+                      )}
+                      {section.synth?.enabled && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenSectionLayer(section.id, 'synth');
+                          }}
+                          className="px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/45 text-[10px] font-semibold text-sky-400 hover:bg-sky-500/25 transition"
+                        >
+                          Synth: {section.synth.tone} · {formatLayerBarRangeLabel(section.synth, secBarCount)}
+                        </button>
+                      )}
+                      {section.arp?.enabled && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenSectionLayer(section.id, 'arp');
+                          }}
+                          className="px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/45 text-[10px] font-semibold text-orange-400 hover:bg-orange-500/25 transition"
+                        >
+                          Arp: {section.arp.tone} · {formatLayerBarRangeLabel(section.arp, secBarCount)}
+                        </button>
                       )}
                     </div>
                     <p className="text-[13px] text-[var(--text-muted)] mt-0.5 tabular-nums">
@@ -894,6 +985,17 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
             </div>
           </div>
         </div>
+      ) : tab === 'synth' ? (
+        <SynthBackingTab
+          song={song}
+          isPlaying={isPlaying}
+          activeBarId={activeBarId}
+          metronomeSettings={metronomeSettings}
+          synthSettings={synthSettings}
+          onUpdateSynthSettings={onUpdateSynthSettings}
+          onSeekToBarId={onSeekToBarId}
+          onOpenSectionLayer={onOpenSectionLayer}
+        />
       ) : (
         /* LYRICS TAB */
         <div className="mt-5 rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-6 space-y-6 shadow-xs">

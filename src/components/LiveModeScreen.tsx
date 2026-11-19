@@ -3,6 +3,7 @@ import { ArrowLeft, Radio, Users, Wifi } from 'lucide-react';
 import type { RoomPresence, Song, TimelineBar } from '../types';
 import { formatBarChordsSummary, transposeKey } from '../utils/chords';
 import { useWakeLock } from '../hooks/useWakeLock';
+import { SectionLayerDotsCluster, type SectionLayerType } from './SectionMultiPadModal';
 
 interface LiveModeScreenProps {
   songs: Song[];
@@ -20,6 +21,7 @@ interface LiveModeScreenProps {
   onSeekToSection: (sectionId: string) => void;
   onSeekToBarIndex: (idx: number) => void;
   onOpenLocalWifi: () => void;
+  onOpenSectionLayer: (sectionId: string, layer: SectionLayerType) => void;
 }
 
 export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
@@ -38,6 +40,7 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
   onSeekToSection,
   onSeekToBarIndex,
   onOpenLocalWifi,
+  onOpenSectionLayer,
 }) => {
   // Keep Leader screen awake on stage in Live Mode
   useWakeLock(true);
@@ -228,24 +231,33 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
         <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase mb-2.5">
           JUMP TO SECTION
         </p>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2.5">
           {activeSong.sections
             .filter((sec) => !sec.isReference)
             .map((sec) => {
               const isCurrentSec = currentStep?.sectionId === sec.id;
               return (
-                <button
+                <div
                   key={sec.id}
-                  type="button"
-                  onClick={() => onSeekToSection(sec.id)}
-                  className={`px-3.5 py-2 rounded-full border text-xs font-medium transition ${
+                  className={`inline-flex items-center gap-1.5 pl-3.5 pr-1.5 py-1 rounded-full border transition ${
                     isCurrentSec
                       ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
                       : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-primary)]/85 hover:bg-[var(--bg-elevated)]'
                   }`}
                 >
-                  {sec.name}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => onSeekToSection(sec.id)}
+                    className="py-1 text-xs font-medium text-left"
+                  >
+                    {sec.name}
+                  </button>
+                  <SectionLayerDotsCluster
+                    section={sec}
+                    disabled={isLocked}
+                    onOpen={(layer) => onOpenSectionLayer(sec.id, layer)}
+                  />
+                </div>
               );
             })}
         </div>

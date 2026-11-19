@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChordbookAudioEngine } from './audio/AudioEngine';
+import {
+  loadSynthBackingSettings,
+  saveSynthBackingSettings,
+  ToneSynthBackingEngine,
+} from './audio/synthEngine';
 import { BarEditorModal, type BarEditorMode } from './components/BarEditorModal';
 import { ChordSheetScreen } from './components/ChordSheetScreen';
 import { ExportAudioModal } from './components/ExportAudioModal';
@@ -10,6 +15,12 @@ import { NavDrawer } from './components/NavDrawer';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PersistentPlayBar } from './components/PersistentPlayBar';
 import { PracticePlayerScreen, PracticeSelectScreen } from './components/PracticeScreens';
+import {
+  DEFAULT_SECTION_ARP,
+  DEFAULT_SECTION_MULTI_PAD,
+  DEFAULT_SECTION_SYNTH,
+} from './audio/synthEngine';
+import { SectionLayerModal, type SectionLayerType } from './components/SectionMultiPadModal';
 import { SheetsHomeScreen, type ImportedJsonPayload } from './components/SheetsHomeScreen';
 import { SimpleMemberView } from './components/SimpleMemberView';
 import { TopBar } from './components/TopBar';
@@ -24,8 +35,12 @@ import type {
   MetronomeSettings,
   RoomSyncState,
   ScreenName,
+  SectionArpConfig,
+  SectionMultiPadConfig,
+  SectionSynthConfig,
   Setlist,
   Song,
+  SynthBackingSettings,
   TimeSignature,
 } from './types';
 import { buildSongTimeline, createEmptyBar, getGlobalDisplayBarNumber } from './utils/chords';
@@ -85,6 +100,9 @@ export default function App() {
   const [settings, setSettings] = useState<MetronomeSettings>(() =>
     loadFromStorage<MetronomeSettings>(STORAGE_KEYS.settings, DEFAULT_SETTINGS)
   );
+  const [synthSettings, setSynthSettings] = useState<SynthBackingSettings>(() =>
+    loadSynthBackingSettings()
+  );
   const [roomId, setRoomId] = useState<string>(() =>
     (urlRoom || loadFromStorage<string>(STORAGE_KEYS.roomId, '4829')).toUpperCase()
   );
@@ -122,6 +140,10 @@ export default function App() {
   const [showMetronomeModal, setShowMetronomeModal] = useState(false);
   const [showExportAudioModal, setShowExportAudioModal] = useState(false);
   const [cueLibraryVersion, setCueLibraryVersion] = useState(0);
+  const [sectionLayerModal, setSectionLayerModal] = useState<{
+    sectionId: string;
+    layer: SectionLayerType;
+  } | null>(null);
 
   // Member synced state (used when role === 'member' or Preview Member App)
   const [remoteMemberState, setRemoteMemberState] = useState<RoomSyncState | null>(null);
@@ -181,6 +203,10 @@ export default function App() {
       // Ignore
     }
   }, [settings]);
+
+  useEffect(() => {
+    saveSynthBackingSettings(synthSettings);
+  }, [synthSettings]);
 
   useEffect(() => {
     if (isDedicatedMemberUrl) return;
@@ -253,8 +279,13 @@ export default function App() {
     sendState,
   ]);
 
-  // Web Audio Engine ref
+  // Web Audio & Tone Synth Engines
   const audioEngineRef = useRef<ChordbookAudioEngine | null>(null);
+  const synthEngineRef = useRef<ToneSynthBackingEngine | null>(null);
+
+  if (!synthEngineRef.current) {
+    synthEngineRef.current = new ToneSynthBackingEngine(synthSettings);
+  }
 
   if (!audioEngineRef.current) {
     audioEngineRef.current = new ChordbookAudioEngine(settings, {
@@ -268,12 +299,19 @@ export default function App() {
         setIsCountIn(countIn);
       },
       onStop: () => {
+        synthEngineRef.current?.onPlaybackStop();
         setIsPlaying(false);
         setIsCountIn(false);
         setActiveStepIndex(0);
         setCurrentBeat(1);
         setPlayStartBarIndex(0);
         setPlayStartedAtServerTime(null);
+      },
+      onPlaybackStart: (rawCtx) => {
+        synthEngineRef.current?.onPlaybackStart(rawCtx);
+      },
+      onChordSchedule: (ev) => {
+        synthEngineRef.current?.scheduleChord(ev);
       },
     });
   }
@@ -283,16 +321,22 @@ export default function App() {
   }, [settings]);
 
   useEffect(() => {
+    synthEngineRef.current?.updateSettings(synthSettings);
+  }, [synthSettings]);
+
+  useEffect(() => {
     audioEngineRef.current?.updateLiveParams({
       speedPercent: speed,
       globalTranspose: activeSong?.transpose || 0,
       timeline,
       loopEnabled: screen === 'practice-player' || loopSectionId !== null,
+      suppressBasicChord: synthSettings.masterEnabled,
     });
-  }, [speed, activeSong?.transpose, timeline, screen, loopSectionId]);
+  }, [speed, activeSong?.transpose, timeline, screen, loopSectionId, synthSettings.masterEnabled]);
 
   useEffect(() => {
     return () => {
+      synthEngineRef.current?.destroy();
       audioEngineRef.current?.destroy();
     };
   }, []);
@@ -320,6 +364,7 @@ export default function App() {
   );
 
   const stopPlayback = useCallback(() => {
+    synthEngineRef.current?.onPlaybackStop();
     audioEngineRef.current?.stop(false);
     setIsPlaying(false);
     setIsCountIn(false);
@@ -807,6 +852,18 @@ export default function App() {
             });
             setScreen('sheets');
           }}
+          metronomeSettings={settings}
+          synthSettings={synthSettings}
+          onUpdateSynthSettings={setSynthSettings}
+          onSeekToBarId={(sectionId, barId) => {
+            const idx = timeline.findIndex(
+              (step) => step.sectionId === sectionId && step.barId === barId
+            );
+            startPlaybackFromIndex(idx >= 0 ? idx : 0, true);
+          }}
+          onOpenSectionLayer={(sectionId, layer) =>
+            setSectionLayerModal({ sectionId, layer })
+          }
         />
       )}
 
@@ -871,6 +928,9 @@ export default function App() {
               setActiveStepIndex(idx);
             }
           }}
+          onOpenSectionLayer={(sectionId, layer) =>
+            setSectionLayerModal({ sectionId, layer })
+          }
         />
       )}
 
@@ -911,6 +971,9 @@ export default function App() {
             else setActiveStepIndex(idx);
           }}
           onOpenLocalWifi={() => setScreen('local-wifi')}
+          onOpenSectionLayer={(sectionId, layer) =>
+            setSectionLayerModal({ sectionId, layer })
+          }
         />
       )}
 
@@ -1049,6 +1112,85 @@ export default function App() {
           onClose={() => setShowExportAudioModal(false)}
         />
       )}
+
+      {/* Per-Section Multi-Pad / Synth / Arpeggios Popup */}
+      {sectionLayerModal &&
+        activeSong &&
+        (() => {
+          const targetSec = activeSong.sections.find(
+            (s) => s.id === sectionLayerModal.sectionId && !s.isReference
+          );
+          if (!targetSec) return null;
+          const firstRealChord =
+            targetSec.bars.find((b) => b.chord && b.chord.trim() !== '-')?.chord ||
+            activeSong.key ||
+            'C';
+          return (
+            <SectionLayerModal
+              key={`${targetSec.id}-${sectionLayerModal.layer}`}
+              section={targetSec}
+              initialLayer={sectionLayerModal.layer}
+              songBpm={activeSong.bpm}
+              isLocked={isLocked}
+              onUpdatePad={(nextPad: SectionMultiPadConfig) => {
+                updateActiveSong((s) => ({
+                  ...s,
+                  sections: s.sections.map((sec) =>
+                    sec.id === targetSec.id ? { ...sec, multiPad: nextPad } : sec
+                  ),
+                }));
+              }}
+              onUpdateSynth={(nextSynth: SectionSynthConfig) => {
+                updateActiveSong((s) => ({
+                  ...s,
+                  sections: s.sections.map((sec) =>
+                    sec.id === targetSec.id ? { ...sec, synth: nextSynth } : sec
+                  ),
+                }));
+              }}
+              onUpdateArp={(nextArp: SectionArpConfig) => {
+                updateActiveSong((s) => ({
+                  ...s,
+                  sections: s.sections.map((sec) =>
+                    sec.id === targetSec.id ? { ...sec, arp: nextArp } : sec
+                  ),
+                }));
+              }}
+              onPreview={(layer) => {
+                if (layer === 'pad') {
+                  const cfg = targetSec.multiPad || DEFAULT_SECTION_MULTI_PAD;
+                  void synthEngineRef.current?.previewSectionLayer({
+                    layer: 'pad',
+                    tone: cfg.tone,
+                    pattern: cfg.pattern,
+                    chordStr: firstRealChord,
+                    bpm: activeSong.bpm,
+                  });
+                } else if (layer === 'synth') {
+                  const cfg = targetSec.synth || DEFAULT_SECTION_SYNTH;
+                  void synthEngineRef.current?.previewSectionLayer({
+                    layer: 'synth',
+                    tone: cfg.tone,
+                    pattern: cfg.pattern,
+                    chordStr: firstRealChord,
+                    bpm: activeSong.bpm,
+                  });
+                } else {
+                  const cfg = targetSec.arp || DEFAULT_SECTION_ARP;
+                  void synthEngineRef.current?.previewSectionLayer({
+                    layer: 'arp',
+                    tone: cfg.tone,
+                    pattern: cfg.pattern,
+                    subdivision: cfg.subdivision,
+                    chordStr: firstRealChord,
+                    bpm: activeSong.bpm,
+                  });
+                }
+              }}
+              onClose={() => setSectionLayerModal(null)}
+            />
+          );
+        })()}
     </div>
   );
 }

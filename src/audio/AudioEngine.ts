@@ -1,4 +1,11 @@
-import type { CustomVoiceCue, MetronomeSettings, TimelineBar } from '../types';
+import type {
+  CustomVoiceCue,
+  MetronomeSettings,
+  SectionArpConfig,
+  SectionMultiPadConfig,
+  SectionSynthConfig,
+  TimelineBar,
+} from '../types';
 import { hasBeatSplits, shouldTriggerBarVoiceCueAndCount } from '../utils/chords';
 import {
   BUNDLED_COUNT_CUES,
@@ -14,10 +21,28 @@ import {
   scheduleSubdivisionClicks,
 } from './cubaseClick';
 
+export interface ChordScheduleEvent {
+  rawCtx: AudioContext;
+  time: number;
+  chordStr: string;
+  semitones: number;
+  durationSec: number;
+  beatDurationSec: number;
+  effectiveBpm: number;
+  sectionId: string;
+  sectionBarNumber: number;
+  sectionTotalBars: number;
+  sectionMultiPad?: SectionMultiPadConfig;
+  sectionSynth?: SectionSynthConfig;
+  sectionArp?: SectionArpConfig;
+}
+
 export interface PlaybackCallbacks {
   onBarChange: (timelineIndex: number, displayBarNumber: number, sectionId: string, beat: number, isCountIn: boolean) => void;
   onBeat: (beat: number, totalBeats: number, isCountIn: boolean) => void;
   onStop: () => void;
+  onPlaybackStart?: (rawCtx: AudioContext) => void;
+  onChordSchedule?: (event: ChordScheduleEvent) => void;
 }
 
 /**
@@ -75,6 +100,7 @@ export class ChordbookAudioEngine {
   private countInBeat = 0;
   private countInTotalBeats = 4;
   private loopEnabled = false;
+  private suppressBasicChord = false;
   private scheduledTimers: number[] = [];
   private lastUiBeatTime = 0;
 
@@ -402,6 +428,7 @@ export class ChordbookAudioEngine {
     tempoOverride?: number | null;
     timeline?: TimelineBar[];
     loopEnabled?: boolean;
+    suppressBasicChord?: boolean;
   }): void {
     if (params.speedPercent !== undefined) this.speedPercent = params.speedPercent;
     if (params.globalTranspose !== undefined) this.globalTranspose = params.globalTranspose;
@@ -413,6 +440,7 @@ export class ChordbookAudioEngine {
       }
     }
     if (params.loopEnabled !== undefined) this.loopEnabled = params.loopEnabled;
+    if (params.suppressBasicChord !== undefined) this.suppressBasicChord = params.suppressBasicChord;
   }
 
   public start(options: {
@@ -454,6 +482,7 @@ export class ChordbookAudioEngine {
     this.isRunning = true;
     this.nextNoteTime = ctx.currentTime + 0.06;
 
+    this.callbacks.onPlaybackStart?.(ctx);
     this.startBackgroundKeepAlive(ctx);
     this.scheduler();
     this.startSchedulerTicker();
@@ -539,8 +568,34 @@ export class ChordbookAudioEngine {
     );
   }
 
-  private playChord(time: number, chordStr: string, semitones: number, durationSec: number): void {
-    if (!this.ctx || !this.settings.chordAudioEnabled || this.settings.chordVolume <= 0) return;
+  private playChord(
+    time: number,
+    chordStr: string,
+    semitones: number,
+    durationSec: number,
+    beatDurationSec: number,
+    effectiveBpm: number,
+    step: TimelineBar
+  ): void {
+    if (!this.ctx) return;
+    this.callbacks.onChordSchedule?.({
+      rawCtx: this.ctx,
+      time,
+      chordStr,
+      semitones,
+      durationSec,
+      beatDurationSec,
+      effectiveBpm,
+      sectionId: step.sectionId,
+      sectionBarNumber: step.sectionBarNumber,
+      sectionTotalBars: step.sectionTotalBars,
+      sectionMultiPad: step.sectionMultiPad,
+      sectionSynth: step.sectionSynth,
+      sectionArp: step.sectionArp,
+    });
+    if (this.suppressBasicChord || !this.settings.chordAudioEnabled || this.settings.chordVolume <= 0) {
+      return;
+    }
     scheduleChordSynth(
       this.ctx,
       this.ctx.destination,
@@ -653,10 +708,37 @@ export class ChordbookAudioEngine {
             if (nextVal && nextVal !== '-') break;
             holdBeats += 1;
           }
-          this.playChord(scheduledTime, beatChord, totalTranspose, beatDurationSec * holdBeats);
+          this.playChord(
+            scheduledTime,
+            beatChord,
+            totalTranspose,
+            beatDurationSec * holdBeats,
+            beatDurationSec,
+            effectiveBpm,
+            currentStep
+          );
+        } else if (beatNum === 1) {
+          // Ensure bar-boundary tracking & bar-range exits still run on split bars with a beat-1 rest
+          this.playChord(
+            scheduledTime,
+            '-',
+            totalTranspose,
+            beatDurationSec * beatsInBar,
+            beatDurationSec,
+            effectiveBpm,
+            currentStep
+          );
         }
       } else if (beatNum === 1) {
-        this.playChord(scheduledTime, currentStep.bar.chord, totalTranspose, beatDurationSec * beatsInBar);
+        this.playChord(
+          scheduledTime,
+          currentStep.bar.chord,
+          totalTranspose,
+          beatDurationSec * beatsInBar,
+          beatDurationSec,
+          effectiveBpm,
+          currentStep
+        );
       }
 
       const allowLastBarVoice = shouldTriggerBarVoiceCueAndCount(currentStep);

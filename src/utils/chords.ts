@@ -164,15 +164,36 @@ export function shouldTriggerBarVoiceCueAndCount(step: TimelineBar): boolean {
   return true;
 }
 
+export function getSectionTotalBars(section: { bars: Bar[]; isReference?: boolean }): number {
+  if (section.isReference || section.bars.length === 0) return 0;
+  return section.bars.reduce(
+    (bAcc, bar) => bAcc + (bar.repeat && bar.repeat > 1 ? bar.repeat : 1),
+    0
+  );
+}
+
 export function getSongTotalBars(song: Song): number {
-  return song.sections.reduce((acc, sec) => {
-    if (sec.isReference || sec.bars.length === 0) return acc;
-    const secTotal = sec.bars.reduce(
-      (bAcc, bar) => bAcc + (bar.repeat && bar.repeat > 1 ? bar.repeat : 1),
-      0
-    );
-    return acc + secTotal;
-  }, 0);
+  return song.sections.reduce((acc, sec) => acc + getSectionTotalBars(sec), 0);
+}
+
+export function isBarInSectionLayerRange(
+  config:
+    | {
+        enabled?: boolean;
+        barRangeMode?: 'all' | 'custom';
+        startBar?: number;
+        endBar?: number;
+      }
+    | undefined,
+  sectionBarNumber: number,
+  sectionTotalBars: number
+): boolean {
+  if (!config?.enabled) return false;
+  if (!config.barRangeMode || config.barRangeMode === 'all') return true;
+  const maxBar = Math.max(1, sectionTotalBars);
+  const start = Math.max(1, Math.min(maxBar, config.startBar ?? 1));
+  const end = Math.max(start, Math.min(maxBar, config.endBar ?? maxBar));
+  return sectionBarNumber >= start && sectionBarNumber <= end;
 }
 
 export function buildSongTimeline(
@@ -216,6 +237,8 @@ export function buildSongTimeline(
             displayBarNumber: barNumForStep,
             sectionId: section.id,
             sectionName: section.name,
+            sectionBarNumber: localBarOffset,
+            sectionTotalBars: sectionBarSpan,
             barId: bar.id,
             bar,
             repeatIteration: r,
@@ -228,6 +251,9 @@ export function buildSongTimeline(
             sectionTotalPasses: sectionPasses,
             isLastBarOfSection,
             lastBarCuePassRule: section.lastBarCuePassRule ?? 'all',
+            sectionMultiPad: section.multiPad,
+            sectionSynth: section.synth,
+            sectionArp: section.arp,
           });
         }
       }

@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Printer, X } from 'lucide-react';
+import { Check, Download, Loader2, Printer, X } from 'lucide-react';
 import type { Bar, Section, Song } from '../types';
 import {
   formatBarChordsSummary,
   formatLastBarCuePassPrintBadge,
   transposeKey,
 } from '../utils/chords';
+import { downloadSongChordSheetPdf } from '../utils/pdfExport';
 
 interface PrintableChordSheetModalProps {
   song: Song;
@@ -27,6 +28,9 @@ export const PrintableChordSheetModal: React.FC<PrintableChordSheetModalProps> =
 }) => {
   const [includeLyrics, setIncludeLyrics] = useState(true);
   const [includeCues, setIncludeCues] = useState(true);
+  const [isSavingPdf, setIsSavingPdf] = useState(false);
+  const [pdfNotice, setPdfNotice] = useState<string | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   useEffect(() => {
     document.body.classList.add('printing-chord-sheet');
@@ -35,67 +39,126 @@ export const PrintableChordSheetModal: React.FC<PrintableChordSheetModalProps> =
     };
   }, []);
 
+  const handleSavePdf = async () => {
+    if (isSavingPdf) return;
+    setIsSavingPdf(true);
+    setPdfError(null);
+    setPdfNotice(null);
+    try {
+      const filename = await downloadSongChordSheetPdf(song, {
+        includeCues,
+        includeLyrics,
+      });
+      setPdfNotice(`Saved ${filename}`);
+      setTimeout(() => setPdfNotice((cur) => (cur === `Saved ${filename}` ? null : cur)), 3500);
+    } catch (err) {
+      setPdfError(
+        err instanceof Error ? err.message : 'Unable to generate PDF file on this device.'
+      );
+    } finally {
+      setIsSavingPdf(false);
+    }
+  };
+
+  const handlePrintSheet = () => {
+    setPdfError(null);
+    try {
+      window.print();
+    } catch {
+      setPdfError('Direct print is unavailable here — use Save PDF instead.');
+    }
+  };
+
   const displayKey = transposeKey(song.key, song.transpose || 0);
 
   return createPortal(
     <div className="print-modal-wrapper fixed inset-0 z-50 bg-black/80 backdrop-blur-xs overflow-y-auto p-3 sm:p-6">
       {/* Non-printed Action Toolbar */}
-      <div className="no-print max-w-[210mm] mx-auto mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] px-4 py-3 shadow-xl">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close PDF print sheet"
-            className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-center transition"
-          >
-            <X className="w-4 h-4" />
-          </button>
-          <div>
-            <p className="text-sm font-semibold text-[var(--text-primary)]">
-              Printable A4 Chord Sheet
-            </p>
-            <p className="text-xs text-[var(--text-muted)]">
-              Two-column classic band chart · Save as PDF or print directly
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIncludeCues((v) => !v)}
-            className={`px-3 py-1.5 rounded-full border text-xs font-medium transition ${
-              includeCues
-                ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
-                : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)]'
-            }`}
-          >
-            {includeCues ? 'Cues: Shown' : 'Cues: Hidden'}
-          </button>
-
-          {song.lyrics.length > 0 && (
+      <div className="no-print max-w-[210mm] mx-auto mb-4 rounded-2xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] px-4 py-3 shadow-xl space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setIncludeLyrics((v) => !v)}
+              onClick={onClose}
+              aria-label="Close PDF print sheet"
+              className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] flex items-center justify-center transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
+                Printable A4 Chord Sheet
+              </p>
+              <p className="text-xs text-[var(--text-muted)]">
+                Two-column classic band chart · Download .PDF offline or print directly
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIncludeCues((v) => !v)}
               className={`px-3 py-1.5 rounded-full border text-xs font-medium transition ${
-                includeLyrics
+                includeCues
                   ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
                   : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)]'
               }`}
             >
-              {includeLyrics ? 'Lyrics: Shown' : 'Lyrics: Hidden'}
+              {includeCues ? 'Cues: Shown' : 'Cues: Hidden'}
             </button>
-          )}
 
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#E5A958] hover:bg-[#ecb66c] text-[#121212] font-semibold text-xs shadow-md transition"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Print / Save PDF</span>
-          </button>
+            {song.lyrics.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIncludeLyrics((v) => !v)}
+                className={`px-3 py-1.5 rounded-full border text-xs font-medium transition ${
+                  includeLyrics
+                    ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                    : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)]'
+                }`}
+              >
+                {includeLyrics ? 'Lyrics: Shown' : 'Lyrics: Hidden'}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handlePrintSheet}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-semibold text-xs transition"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isSavingPdf}
+              onClick={() => void handleSavePdf()}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#E5A958] hover:bg-[#ecb66c] disabled:opacity-60 text-[#121212] font-semibold text-xs shadow-md transition"
+            >
+              {isSavingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              <span>{isSavingPdf ? 'Saving PDF...' : 'Save PDF'}</span>
+            </button>
+          </div>
         </div>
+
+        {pdfNotice && (
+          <div className="flex items-center gap-2 rounded-xl bg-emerald-500/15 border border-emerald-500/40 px-3 py-2 text-xs font-medium text-emerald-400">
+            <Check className="w-3.5 h-3.5 shrink-0" />
+            <span>{pdfNotice}</span>
+          </div>
+        )}
+
+        {pdfError && (
+          <div className="rounded-xl bg-red-500/15 border border-red-500/40 px-3 py-2 text-xs font-medium text-red-400">
+            {pdfError}
+          </div>
+        )}
       </div>
 
       {/* White A4 Paper Sheet */}
