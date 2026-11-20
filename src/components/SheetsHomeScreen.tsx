@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import {
+  Camera,
   Check,
   ChevronDown,
   ChevronRight,
@@ -23,6 +24,7 @@ import {
   getSongTotalBars,
   transposeKey,
 } from '../utils/chords';
+import { ScanChordSheetModal } from './ScanChordSheetModal';
 
 export interface ImportedJsonPayload {
   songs?: Song[];
@@ -77,6 +79,7 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedSetlists, setExpandedSetlists] = useState<Record<string, boolean>>({});
   const [showNewSongModal, setShowNewSongModal] = useState(false);
+  const [showScanModal, setShowScanModal] = useState(false);
   const [showNewSetlistModal, setShowNewSetlistModal] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [copiedTemplate, setCopiedTemplate] = useState(false);
@@ -420,7 +423,24 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
 
       {/* Songs List */}
       {activeTab === 'songs' ? (
-        <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="mt-5 space-y-3">
+          {!isLocked && (
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setShowScanModal(true)}
+                className="min-h-[44px] px-4 py-2 rounded-xl bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[#E5A958]/50 text-xs sm:text-sm font-semibold text-[var(--accent-amber-text)] inline-flex items-center gap-2 transition shadow-xs"
+              >
+                <Camera className="w-4 h-4" />
+                <span>Scan Chord Sheet</span>
+              </button>
+              <span className="text-xs text-[var(--text-muted)] hidden sm:inline">
+                Offline camera &amp; gallery chord OCR
+              </span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {filteredSongs.map((song) => {
             const totalBars = getSongTotalBars(song);
             const displayKey = transposeKey(song.key, song.transpose || 0);
@@ -454,6 +474,7 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
               <p className="text-[var(--text-muted)] text-sm">No songs match &ldquo;{searchQuery}&rdquo;.</p>
             </div>
           )}
+          </div>
         </div>
       ) : (
         <div className="mt-5 space-y-3">
@@ -834,6 +855,17 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Offline Scan Chord Sheet Modal */}
+      {showScanModal && (
+        <ScanChordSheetModal
+          onSaveSong={(scannedSong) => {
+            onCreateSong(scannedSong);
+            setShowScanModal(false);
+          }}
+          onClose={() => setShowScanModal(false)}
+        />
       )}
     </div>
   );
