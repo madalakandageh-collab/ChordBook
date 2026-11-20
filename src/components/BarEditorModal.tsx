@@ -9,6 +9,7 @@ import {
 } from '../utils/chords';
 import { BUNDLED_VOICE_CUES } from '../utils/voiceCues';
 import { CuePointLibrary } from './CuePointLibrary';
+import { ChordDisplay } from './ChordDisplay';
 
 export type BarEditorMode = 'chords' | 'cues';
 
@@ -265,16 +266,18 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveBeatSlot(null)}
-                    className={`h-11 rounded-xl border text-xs font-semibold transition flex flex-col items-center justify-center ${
+                    className={`h-11 rounded-xl border text-xs font-semibold transition flex flex-col items-center justify-center overflow-hidden ${
                       activeBeatSlot === null
                         ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
                         : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                     }`}
                   >
                     <span className="text-[10px] opacity-80">Whole</span>
-                    <span className="font-serif-display text-sm font-bold text-[var(--text-primary)] truncate max-w-full px-1">
-                      {formatChordDisplay(bar.chord)}
-                    </span>
+                    <ChordDisplay
+                      chordText={formatChordDisplay(bar.chord)}
+                      size="xs"
+                      className="font-serif-display text-sm font-bold text-[var(--text-primary)] max-w-full px-1"
+                    />
                   </button>
 
                   {currentBeatSlots.map((slotChord, idx) => {
@@ -284,16 +287,18 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                         key={idx}
                         type="button"
                         onClick={() => setActiveBeatSlot(idx)}
-                        className={`h-11 rounded-xl border text-xs font-semibold transition flex flex-col items-center justify-center ${
+                        className={`h-11 rounded-xl border text-xs font-semibold transition flex flex-col items-center justify-center overflow-hidden ${
                           isSlotActive
                             ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
                             : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                         }`}
                       >
                         <span className="text-[10px] opacity-75 tabular-nums">Beat {idx + 1}</span>
-                        <span className="font-serif-display text-sm font-bold text-[var(--text-primary)] truncate max-w-full px-1">
-                          {slotChord ? formatChordDisplay(slotChord) : '—'}
-                        </span>
+                        <ChordDisplay
+                          chordText={slotChord ? formatChordDisplay(slotChord) : '—'}
+                          size="xs"
+                          className="font-serif-display text-sm font-bold text-[var(--text-primary)] max-w-full px-1"
+                        />
                       </button>
                     );
                   })}
@@ -340,10 +345,12 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                     className="w-full h-14 px-4 rounded-2xl bg-[var(--bg-recessed)] border border-[#E5A958] text-center font-serif-display text-2xl font-bold text-[var(--text-primary)] focus:outline-none"
                   />
                 ) : (
-                  <div className="w-full h-14 rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] flex items-center justify-center">
-                    <span className="font-serif-display text-[24px] font-bold text-[var(--text-primary)]">
-                      {formatChordDisplay(activeChordValue)}
-                    </span>
+                  <div className="w-full h-14 px-4 rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] flex items-center justify-center overflow-hidden">
+                    <ChordDisplay
+                      chordText={formatChordDisplay(activeChordValue)}
+                      size="md"
+                      className="font-serif-display text-[24px] font-bold text-[var(--text-primary)]"
+                    />
                   </div>
                 )}
               </div>

@@ -17,6 +17,7 @@ import {
   type ThemeMode,
 } from '../utils/theme';
 import { PWAInstallButton } from './PWAInstallButton';
+import { ChordDisplay } from './ChordDisplay';
 
 interface SimpleMemberViewProps {
   roomId: string;
@@ -301,7 +302,7 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
                         <div
                           key={bar.id}
                           ref={isActive ? activeBarRef : undefined}
-                          className={`relative min-h-[88px] rounded-2xl border p-2 flex flex-col items-center justify-center text-center transition ${
+                          className={`relative min-h-[88px] rounded-2xl border p-2 flex flex-col items-center justify-center text-center transition overflow-hidden ${
                             isActive
                               ? 'bg-[var(--accent-amber-active-bar)] border-[#E5A958] ring-2 ring-[#E5A958]/50 scale-[1.02]'
                               : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)]'
@@ -323,17 +324,17 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
                               )}
                             </span>
                           )}
-                          <span
+                          <ChordDisplay
+                            chordText={chordText}
+                            size="sm"
                             className={`font-serif-display ${
                               isSplit ? 'text-[16px] sm:text-[18px]' : 'text-[22px] sm:text-[26px]'
-                            } font-bold max-w-full truncate ${
+                            } font-bold max-w-full ${
                               isActive
                                 ? 'text-[var(--accent-amber-text)]'
                                 : 'text-[var(--text-primary)]'
                             }`}
-                          >
-                            {chordText}
-                          </span>
+                          />
                           {bar.lyrics && (
                             <span className="text-[10px] font-sinhala text-[var(--text-muted)] mt-1 truncate max-w-full">
                               {bar.lyrics}

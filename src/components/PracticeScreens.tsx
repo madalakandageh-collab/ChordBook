@@ -3,6 +3,7 @@ import { ArrowLeft, Lock, LockOpen, Repeat, Target } from 'lucide-react';
 import type { Song, TimelineBar } from '../types';
 import { formatBarChordsSummary, transposeKey } from '../utils/chords';
 import { SectionLayerDotsCluster, type SectionLayerType } from './SectionMultiPadModal';
+import { ChordDisplay } from './ChordDisplay';
 
 interface PracticeSelectScreenProps {
   songs: Song[];
@@ -213,9 +214,9 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
         </div>
 
         {/* Main Active Chord Display */}
-        <div className="rounded-3xl bg-[var(--bg-stage)] border border-[var(--border-subtle)] py-12 px-6 flex flex-col items-center justify-center text-center min-h-[205px] shadow-xs">
-          <div className="font-serif-display text-[48px] sm:text-[56px] leading-none font-bold text-[var(--text-primary)]">
-            {currentChordDisplay}
+        <div className="rounded-3xl bg-[var(--bg-stage)] border border-[var(--border-subtle)] py-12 px-6 flex flex-col items-center justify-center text-center min-h-[205px] shadow-xs overflow-hidden">
+          <div className="font-serif-display text-[48px] sm:text-[56px] leading-none font-bold text-[var(--text-primary)] max-w-full">
+            <ChordDisplay chordText={currentChordDisplay} size="lg" />
           </div>
           {currentStep?.bar.lyrics && (
             <div className="mt-2 font-sinhala text-sm text-[var(--text-primary)]/85">
@@ -255,13 +256,13 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
               type="button"
               disabled={!item}
               onClick={() => item && onSeekToBarIndex(item.idx)}
-              className={`h-14 rounded-2xl border flex items-center justify-center font-serif-display text-[20px] font-semibold transition shadow-xs ${
+              className={`h-14 rounded-2xl border px-2 flex items-center justify-center font-serif-display text-[20px] font-semibold transition shadow-xs overflow-hidden ${
                 item?.isCurrent
                   ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--text-primary)]'
                   : 'bg-[var(--bg-stage)] border-[var(--border-subtle)] text-[var(--text-primary)]/85 hover:bg-[var(--bg-elevated)]'
               }`}
             >
-              {item ? item.chord : ''}
+              {item ? <ChordDisplay chordText={item.chord} size="sm" className="max-w-full" /> : ''}
             </button>
           ))}
         </div>

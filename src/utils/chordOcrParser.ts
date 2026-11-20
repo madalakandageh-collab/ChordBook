@@ -248,11 +248,18 @@ export function fixChordToken(rawToken: string): { fixed: string; wasCorrected: 
  * and extracts normalized bar cells from a line of chords.
  */
 function parseChordLineToBarCells(rawLine: string, corrections: Set<string>): string[][] | null {
-  // Normalize obvious barline unicode & join split accidentals/suffixes like "F #m" -> "F#m", "A 7" -> "A7"
+  // Normalize obvious barline unicode & join split accidentals/suffixes/slash bass like "F #m" -> "F#m", "A 7" -> "A7", "C / G" -> "C/G"
   let line = rawLine
     .replace(/[∣｜¦│┃]/g, '|')
-    .replace(/([A-G])\s+([#b])(?=\s|$|[A-Za-z0-9|])/g, '$1$2')
-    .replace(/([A-G][#b]?)\s+(rn|nn|m7|maj7|sus4|sus2|add9|dim|aug|m|7|T)(?=\s|$|[|Il1])/g, '$1$2');
+    .replace(/([A-Ga-gN468])\s+([#b])(?=\s|$|[A-Za-z0-9|/])/g, '$1$2')
+    .replace(
+      /([A-Ga-gN468][#b]?(?:m|maj|min|dim|aug|sus|add|\d|rn|nn|T)*)\s+(rn|nn|m7|maj7|sus4|sus2|add9|dim|aug|m|7|T)(?=\s|$|[|Il1/])/g,
+      '$1$2'
+    )
+    .replace(
+      /([A-Ga-gN468][#b]?(?:maj7|maj|min7|min|m7b5|m7|m|rn|nn|7|T|sus4|sus2|add9|dim|aug|6|9)?)\s*(?<!\/)\/(?!\/)\s*([A-Ga-gN][#b]?(?:m|rn|nn)?)(?=\s|$|[|Il1])/g,
+      '$1/$2'
+    );
 
   // Convert standalone barline misreads between whitespace into `|`
   // e.g. "G l Em I C 1 D" -> "G | Em | C | D"

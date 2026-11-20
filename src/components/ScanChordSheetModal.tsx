@@ -26,6 +26,7 @@ import {
   type OfflineOcrProgress,
 } from '../utils/offlineOcr';
 import { formatBarChordsSummary } from '../utils/chords';
+import { ChordDisplay } from './ChordDisplay';
 
 interface ScanChordSheetModalProps {
   onSaveSong: (song: Song) => void;
@@ -886,14 +887,16 @@ export const ScanChordSheetModal: React.FC<ScanChordSheetModalProps> = ({
                             {sec.bars.map((bar, bIdx) => (
                               <div
                                 key={bar.id}
-                                className="px-2 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-center"
+                                className="px-2 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-center overflow-hidden flex flex-col items-center justify-center"
                               >
                                 <span className="block text-[10px] text-[var(--text-subtle)] tabular-nums">
                                   {bIdx + 1}
                                 </span>
-                                <span className="font-serif-display text-sm font-bold text-[var(--text-primary)]">
-                                  {formatBarChordsSummary(bar)}
-                                </span>
+                                <ChordDisplay
+                                  chordText={formatBarChordsSummary(bar)}
+                                  size="xs"
+                                  className="font-serif-display text-sm font-bold text-[var(--text-primary)] max-w-full"
+                                />
                               </div>
                             ))}
                           </div>

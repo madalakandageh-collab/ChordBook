@@ -36,6 +36,7 @@ import {
   type SectionLayerType,
 } from './SectionMultiPadModal';
 import { SynthBackingTab } from './SynthBackingTab';
+import { ChordDisplay } from './ChordDisplay';
 import {
   copyTextToClipboard,
   createSongJsonTemplate,
@@ -901,7 +902,7 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                             disabled={isLocked}
                             tabIndex={isCollapsed ? -1 : undefined}
                             onClick={() => onOpenBarEditor(section.id, bar.id)}
-                            className={`relative min-h-[82px] rounded-2xl border p-2.5 flex flex-col items-center justify-center transition text-center ${
+                            className={`relative min-h-[82px] rounded-2xl border p-2.5 flex flex-col items-center justify-center transition text-center overflow-hidden ${
                               isBarActive
                                 ? 'bg-[var(--accent-amber-tint-strong)] border-[#E5A958] ring-2 ring-[#E5A958]/35'
                                 : 'bg-[var(--bg-recessed)] hover:bg-[var(--bg-bar-hover)] border-[var(--border-subtle)]'
@@ -927,15 +928,15 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                               </span>
                             )}
 
-                            <span
+                            <ChordDisplay
+                              chordText={displayChord}
+                              size="sm"
                               className={`font-serif-display ${
                                 isSplit ? 'text-[14px] sm:text-[16px]' : 'text-[18px] sm:text-[20px]'
-                              } font-semibold mt-1 leading-tight max-w-full truncate ${
+                              } font-semibold mt-1 leading-tight max-w-full ${
                                 isBarActive ? 'text-[var(--accent-amber-text)]' : 'text-[var(--text-primary)]'
                               }`}
-                            >
-                              {displayChord}
-                            </span>
+                            />
 
                             {bar.lyrics && (
                               <span className="text-[10px] font-sinhala text-[var(--text-muted)] mt-1 truncate max-w-full">

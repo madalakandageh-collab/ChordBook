@@ -8,6 +8,7 @@ import {
   transposeKey,
 } from '../utils/chords';
 import { downloadSongChordSheetPdf } from '../utils/pdfExport';
+import { ChordDisplay } from './ChordDisplay';
 
 interface PrintableChordSheetModalProps {
   song: Song;
@@ -248,16 +249,18 @@ export const PrintableChordSheetModal: React.FC<PrintableChordSheetModalProps> =
                             return (
                               <div
                                 key={bar.id}
-                                className={`px-1.5 py-1.5 min-h-[38px] flex flex-col items-center justify-center text-center ${
+                                className={`px-1.5 py-1.5 min-h-[38px] flex flex-col items-center justify-center text-center overflow-hidden ${
                                   hasRightSeparator ? 'border-r border-slate-400' : ''
                                 }`}
                               >
                                 <div className="flex items-baseline justify-center gap-0.5 max-w-full">
-                                  <span className="font-bold text-[13px] text-[#111827] leading-tight truncate">
-                                    {printableChord}
-                                  </span>
+                                  <ChordDisplay
+                                    chordText={printableChord}
+                                    size="xs"
+                                    className="font-bold text-[13px] text-[#111827] leading-tight max-w-full"
+                                  />
                                   {barRepeat > 1 && (
-                                    <span className="text-[9px] font-semibold text-slate-600 tabular-nums">
+                                    <span className="text-[9px] font-semibold text-slate-600 tabular-nums shrink-0">
                                       ×{barRepeat}
                                     </span>
                                   )}

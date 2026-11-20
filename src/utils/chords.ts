@@ -115,6 +115,27 @@ export function formatChordDisplay(chord: string): string {
   return chord.trim();
 }
 
+export interface ParsedSlashChord {
+  main: string;
+  bass: string | null;
+}
+
+export function splitSlashChord(chord: string): ParsedSlashChord {
+  const clean = formatChordDisplay(chord);
+  if (clean === '—') {
+    return { main: '—', bass: null };
+  }
+  const slashIdx = clean.indexOf('/');
+  if (slashIdx > 0 && slashIdx < clean.length - 1) {
+    const main = clean.slice(0, slashIdx).trim();
+    const bass = clean.slice(slashIdx + 1).trim();
+    if (main && bass) {
+      return { main, bass };
+    }
+  }
+  return { main: clean, bass: null };
+}
+
 export function parseMeterBeats(meter: BarMeter | string): number {
   const [numStr] = (meter || '4/4').split('/');
   const num = parseInt(numStr, 10);

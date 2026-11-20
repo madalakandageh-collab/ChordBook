@@ -34,6 +34,7 @@ import {
   SectionLayerDotsCluster,
   type SectionLayerType,
 } from './SectionMultiPadModal';
+import { ChordDisplay } from './ChordDisplay';
 
 interface SynthBackingTabProps {
   song: Song;
@@ -340,7 +341,7 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
                         ref={isBarActive ? activeMirrorBarRef : undefined}
                         type="button"
                         onClick={() => onSeekToBarId(section.id, bar.id)}
-                        className={`relative min-h-[56px] rounded-xl border px-2 py-2 flex flex-col items-center justify-center text-center transition ${
+                        className={`relative min-h-[56px] rounded-xl border px-2 py-2 flex flex-col items-center justify-center text-center transition overflow-hidden ${
                           isBarActive
                             ? 'bg-[var(--accent-amber-tint-strong)] border-[#E5A958] ring-2 ring-[#E5A958]/40'
                             : 'bg-[var(--bg-recessed)] hover:bg-[var(--bg-bar-hover)] border-[var(--border-subtle)]'
@@ -354,15 +355,15 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
                             ×{repeats}
                           </span>
                         )}
-                        <span
-                          className={`font-serif-display font-semibold leading-tight max-w-full truncate ${
+                        <ChordDisplay
+                          chordText={chordLabel}
+                          size="xs"
+                          className={`font-serif-display font-semibold leading-tight max-w-full ${
                             isSplit ? 'text-[12px] sm:text-[13px]' : 'text-[15px] sm:text-[16px]'
                           } ${
                             isBarActive ? 'text-[var(--accent-amber-text)]' : 'text-[var(--text-primary)]'
                           }`}
-                        >
-                          {chordLabel}
-                        </span>
+                        />
                       </button>
                     );
                   })}

@@ -4,6 +4,7 @@ import type { RoomPresence, Song, TimelineBar } from '../types';
 import { formatBarChordsSummary, transposeKey } from '../utils/chords';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { SectionLayerDotsCluster, type SectionLayerType } from './SectionMultiPadModal';
+import { ChordDisplay } from './ChordDisplay';
 
 interface LiveModeScreenProps {
   songs: Song[];
@@ -164,9 +165,9 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
       </div>
 
       {/* Big Stage Active Chord Display */}
-      <div className="rounded-3xl bg-[var(--bg-stage)] border border-[var(--border-subtle)] py-12 px-6 flex flex-col items-center justify-center text-center shadow-xs">
-        <div className="font-serif-display text-[56px] sm:text-[68px] leading-none font-bold text-[var(--text-primary)]">
-          {currentChord}
+      <div className="rounded-3xl bg-[var(--bg-stage)] border border-[var(--border-subtle)] py-12 px-6 flex flex-col items-center justify-center text-center shadow-xs overflow-hidden">
+        <div className="font-serif-display text-[56px] sm:text-[68px] leading-none font-bold text-[var(--text-primary)] max-w-full">
+          <ChordDisplay chordText={currentChord} size="lg" />
         </div>
         {currentStep?.bar.lyrics && (
           <div className="mt-2 font-sinhala text-base text-[var(--text-primary)]/90">
@@ -203,7 +204,7 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
             type="button"
             disabled={!item}
             onClick={() => item && onSeekToBarIndex(item.idx)}
-            className={`relative h-20 rounded-2xl border flex flex-col items-center justify-center transition shadow-xs ${
+            className={`relative h-20 rounded-2xl border px-2 flex flex-col items-center justify-center transition shadow-xs overflow-hidden ${
               item?.isCurrent
                 ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
                 : 'bg-[var(--bg-panel)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
@@ -214,7 +215,11 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
                 <span className="absolute top-1.5 left-2 text-[10px] text-[var(--text-subtle)] tabular-nums">
                   {item.barNum}
                 </span>
-                <span className="font-serif-display text-xl font-bold">{item.chord}</span>
+                <ChordDisplay
+                  chordText={item.chord}
+                  size="sm"
+                  className="font-serif-display text-xl font-bold max-w-full"
+                />
                 {item.cue && (
                   <span className="text-[10px] text-[var(--text-muted)] truncate max-w-[90%]">
                     {item.cue}
