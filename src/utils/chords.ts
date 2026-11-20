@@ -1,4 +1,25 @@
-import type { Bar, BarMeter, LastBarCuePassRule, Section, Setlist, Song, TimelineBar } from '../types';
+import type {
+  ArpLayerEntry,
+  AudioExportFormat,
+  Bar,
+  BarMeter,
+  BarRange,
+  DrumFillFrequency,
+  DrumLayerEntry,
+  FxLayerEntry,
+  LastBarCuePassRule,
+  PadLayerEntry,
+  Section,
+  SectionArpConfig,
+  SectionDrumsConfig,
+  SectionFxConfig,
+  SectionMultiPadConfig,
+  SectionSynthConfig,
+  Setlist,
+  Song,
+  SynthLayerEntry,
+  TimelineBar,
+} from '../types';
 
 const SHARP_SCALE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FLAT_SCALE = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -181,6 +202,54 @@ export function getSongTotalBars(song?: Partial<Song> | null): number {
   return song.sections.reduce((acc, sec) => acc + getSectionTotalBars(sec), 0);
 }
 
+export function getEffectiveBarRanges(
+  config:
+    | {
+        barRangeMode?: 'all' | 'custom';
+        startBar?: number;
+        endBar?: number;
+        barRanges?: BarRange[];
+      }
+    | undefined,
+  sectionTotalBars: number
+): BarRange[] {
+  const maxBar = Math.max(1, sectionTotalBars);
+  if (!config || !config.barRangeMode || config.barRangeMode === 'all') {
+    return [{ startBar: 1, endBar: maxBar }];
+  }
+  const rawList: BarRange[] =
+    Array.isArray(config.barRanges) && config.barRanges.length > 0
+      ? config.barRanges
+      : [{ startBar: config.startBar ?? 1, endBar: config.endBar ?? maxBar }];
+
+  return rawList.map((r) => {
+    const startBar = Math.max(1, Math.min(maxBar, Number(r?.startBar) || 1));
+    const endBar = Math.max(startBar, Math.min(maxBar, Number(r?.endBar) || maxBar));
+    return { startBar, endBar };
+  });
+}
+
+export function formatMultiBarRangesLabel(
+  config:
+    | {
+        barRangeMode?: 'all' | 'custom';
+        startBar?: number;
+        endBar?: number;
+        barRanges?: BarRange[];
+      }
+    | undefined,
+  sectionTotalBars: number
+): string {
+  if (!config?.barRangeMode || config.barRangeMode === 'all') {
+    return 'All Bars';
+  }
+  const ranges = getEffectiveBarRanges(config, sectionTotalBars);
+  const parts = ranges.map((r) =>
+    r.startBar === r.endBar ? `Bar ${r.startBar}` : `Bars ${r.startBar}–${r.endBar}`
+  );
+  return parts.join(', ');
+}
+
 export function isBarInSectionLayerRange(
   config:
     | {
@@ -188,6 +257,7 @@ export function isBarInSectionLayerRange(
         barRangeMode?: 'all' | 'custom';
         startBar?: number;
         endBar?: number;
+        barRanges?: BarRange[];
       }
     | undefined,
   sectionBarNumber: number,
@@ -195,10 +265,158 @@ export function isBarInSectionLayerRange(
 ): boolean {
   if (!config?.enabled) return false;
   if (!config.barRangeMode || config.barRangeMode === 'all') return true;
-  const maxBar = Math.max(1, sectionTotalBars);
-  const start = Math.max(1, Math.min(maxBar, config.startBar ?? 1));
-  const end = Math.max(start, Math.min(maxBar, config.endBar ?? maxBar));
-  return sectionBarNumber >= start && sectionBarNumber <= end;
+  const ranges = getEffectiveBarRanges(config, sectionTotalBars);
+  return ranges.some((r) => sectionBarNumber >= r.startBar && sectionBarNumber <= r.endBar);
+}
+
+export function getNormalizedPadLayers(config?: SectionMultiPadConfig): PadLayerEntry[] {
+  if (!config) return [];
+  if (Array.isArray(config.layers) && config.layers.length > 0) {
+    return config.layers;
+  }
+  return [
+    {
+      id: 'pad-layer-1',
+      enabled: Boolean(config.enabled),
+      pattern: config.pattern || 'Sustain',
+      tone: config.tone || 'Warm Analog Pad',
+      volumeDb: config.volumeDb ?? 0,
+      barRangeMode: config.barRangeMode || 'all',
+      startBar: config.startBar,
+      endBar: config.endBar,
+      barRanges: config.barRanges,
+    },
+  ];
+}
+
+export function getNormalizedSynthLayers(config?: SectionSynthConfig): SynthLayerEntry[] {
+  if (!config) return [];
+  if (Array.isArray(config.layers) && config.layers.length > 0) {
+    return config.layers;
+  }
+  return [
+    {
+      id: 'synth-layer-1',
+      enabled: Boolean(config.enabled),
+      pattern: config.pattern || 'Full Chord',
+      tone: config.tone || 'FM Electric Piano',
+      volumeDb: config.volumeDb ?? 0,
+      barRangeMode: config.barRangeMode || 'all',
+      startBar: config.startBar,
+      endBar: config.endBar,
+      barRanges: config.barRanges,
+    },
+  ];
+}
+
+export function getNormalizedArpLayers(config?: SectionArpConfig): ArpLayerEntry[] {
+  if (!config) return [];
+  if (Array.isArray(config.layers) && config.layers.length > 0) {
+    return config.layers;
+  }
+  return [
+    {
+      id: 'arp-layer-1',
+      enabled: Boolean(config.enabled),
+      pattern: config.pattern || 'upDown',
+      tone: config.tone || 'Synth Pluck Arp',
+      subdivision: config.subdivision || '8n',
+      volumeDb: config.volumeDb ?? 0,
+      barRangeMode: config.barRangeMode || 'all',
+      startBar: config.startBar,
+      endBar: config.endBar,
+      barRanges: config.barRanges,
+    },
+  ];
+}
+
+export function getNormalizedDrumLayers(config?: SectionDrumsConfig): DrumLayerEntry[] {
+  if (!config) return [];
+  if (Array.isArray(config.layers) && config.layers.length > 0) {
+    return config.layers;
+  }
+  return [
+    {
+      id: 'drum-layer-1',
+      enabled: true,
+      kit: config.kit || 'Acoustic Pop Kit',
+      pattern: config.pattern || 'Straight 8th Pop',
+      volumeDb: config.volumeDb ?? 0,
+      barRangeMode: config.barRangeMode || 'all',
+      startBar: config.startBar,
+      endBar: config.endBar,
+      barRanges: config.barRanges,
+      fillFrequency: config.fillFrequency || 'none',
+      customFillBars: config.customFillBars || [],
+      fillStyle: config.fillStyle || 'Tom Fill Cascade',
+    },
+  ];
+}
+
+export function getNormalizedFxLayers(config?: SectionFxConfig): FxLayerEntry[] {
+  if (!config || !Array.isArray(config.effects)) return [];
+  return config.effects.map((fx, idx) => ({
+    id: fx.id || `fx-layer-${idx + 1}`,
+    enabled: Boolean(fx.enabled),
+    effectType: fx.effectType || 'White Noise Riser',
+    startBar: Math.max(1, Math.round(Number(fx.startBar) || 1)),
+    startBeat: Math.max(1, Math.round(Number(fx.startBeat) || 1)),
+    durationBars: Math.max(0.25, Number(fx.durationBars) || 1),
+    volumeDb: Number.isFinite(Number(fx.volumeDb)) ? Number(fx.volumeDb) : 0,
+  }));
+}
+
+export function buildExportAudioFilename(
+  title: string,
+  baseKey: string,
+  transpose = 0,
+  format: AudioExportFormat = 'wav'
+): string {
+  const safeTitle =
+    (title || 'Untitled Song')
+      .replace(/[\\/:*?"<>|]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim() || 'Untitled Song';
+  const effectiveKey =
+    transposeKey(baseKey || 'C', transpose || 0)
+      .replace(/[\\/:*?"<>|]+/g, '')
+      .trim() || 'C';
+  return `${safeTitle} - Key ${effectiveKey}.${format}`;
+}
+
+export function shouldTriggerDrumFill(
+  config:
+    | {
+        fillFrequency?: DrumFillFrequency;
+        customFillBars?: number[];
+      }
+    | undefined,
+  sectionBarNumber: number,
+  sectionTotalBars: number
+): boolean {
+  if (!config) return false;
+  if (
+    Array.isArray(config.customFillBars) &&
+    config.customFillBars.some((b) => Math.round(b) === sectionBarNumber)
+  ) {
+    return true;
+  }
+  const freq = config.fillFrequency || 'none';
+  switch (freq) {
+    case 'every4':
+      return sectionBarNumber >= 4 && sectionBarNumber % 4 === 0;
+    case 'every8':
+      return sectionBarNumber >= 8 && sectionBarNumber % 8 === 0;
+    case 'last1':
+      return sectionBarNumber === sectionTotalBars;
+    case 'last2':
+      return sectionTotalBars >= 2
+        ? sectionBarNumber >= sectionTotalBars - 1
+        : sectionBarNumber === sectionTotalBars;
+    case 'none':
+    default:
+      return false;
+  }
 }
 
 export function buildSongTimeline(
@@ -260,6 +478,8 @@ export function buildSongTimeline(
             sectionMultiPad: section.multiPad,
             sectionSynth: section.synth,
             sectionArp: section.arp,
+            sectionDrums: section.drums,
+            sectionFx: section.fx,
           });
         }
       }
@@ -518,9 +738,11 @@ export function sanitizeSongForLightweightJson(song: Song): Song {
         : {}),
       ...(sec.isReference !== undefined ? { isReference: sec.isReference } : {}),
       ...(sec.referenceTargetId ? { referenceTargetId: sec.referenceTargetId } : {}),
-      ...(sec.multiPad ? { multiPad: { ...sec.multiPad } } : {}),
-      ...(sec.synth ? { synth: { ...sec.synth } } : {}),
-      ...(sec.arp ? { arp: { ...sec.arp } } : {}),
+      ...(sec.multiPad ? { multiPad: JSON.parse(JSON.stringify(sec.multiPad)) } : {}),
+      ...(sec.synth ? { synth: JSON.parse(JSON.stringify(sec.synth)) } : {}),
+      ...(sec.arp ? { arp: JSON.parse(JSON.stringify(sec.arp)) } : {}),
+      ...(sec.drums ? { drums: JSON.parse(JSON.stringify(sec.drums)) } : {}),
+      ...(sec.fx ? { fx: JSON.parse(JSON.stringify(sec.fx)) } : {}),
     })),
     lyrics: normalized.lyrics.map((l) => ({
       id: l.id,

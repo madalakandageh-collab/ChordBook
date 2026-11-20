@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Check,
+  ChevronDown,
+  ChevronUp,
   Copy,
   Edit3,
   FileAudio,
@@ -40,6 +42,11 @@ import {
   formatBarChordsSummary,
   formatLastBarCuePassPrintBadge,
   formatPassOrdinal,
+  getNormalizedArpLayers,
+  getNormalizedDrumLayers,
+  getNormalizedFxLayers,
+  getNormalizedPadLayers,
+  getNormalizedSynthLayers,
   getSongTotalBars,
   hasBeatSplits,
   parseMeterBeats,
@@ -138,6 +145,7 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
   const [editKey, setEditKey] = useState(song.key);
   const [showLyricsEditor, setShowLyricsEditor] = useState(false);
   const [lyricsDraftText, setLyricsDraftText] = useState('');
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -163,6 +171,12 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
 
   const totalBars = getSongTotalBars(song);
   const displayKey = transposeKey(song.key, song.transpose || 0);
+  const isSettingsCardOpen = barEditorMode === 'cues';
+  const showTrackDetails = synthSettings.showTrackDetailsInSections ?? true;
+  const playableSections = song.sections.filter((s) => !s.isReference);
+  const allSectionsCollapsed =
+    playableSections.length > 0 &&
+    playableSections.every((s) => Boolean(collapsedSections[s.id]));
 
   let runningBarNum = 0;
 
@@ -376,80 +390,94 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
         </button>
       </div>
 
-      {/* Transpose & Time Signature Card */}
-      <div className="mt-5 rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-5 space-y-4 shadow-xs">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
-              FULL SONG TRANSPOSE
-            </p>
-            <div className="flex items-baseline gap-2.5 mt-1">
-              <span className="font-serif-display text-[26px] font-bold text-[var(--text-primary)]">
-                {displayKey}
-              </span>
-              <span className="text-[14px] text-[var(--text-muted)]">every chord</span>
-            </div>
-          </div>
+      {/* Collapsible Transpose & Time Signature Card (tied to Cues & Settings toggle) */}
+      <div
+        aria-hidden={!isSettingsCardOpen}
+        className={`grid transition-[grid-template-rows,opacity,margin] duration-300 ease-in-out ${
+          isSettingsCardOpen
+            ? 'grid-rows-[1fr] opacity-100 mt-5'
+            : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-5 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
+                  FULL SONG TRANSPOSE
+                </p>
+                <div className="flex items-baseline gap-2.5 mt-1">
+                  <span className="font-serif-display text-[26px] font-bold text-[var(--text-primary)]">
+                    {displayKey}
+                  </span>
+                  <span className="text-[14px] text-[var(--text-muted)]">every chord</span>
+                </div>
+              </div>
 
-          <div className="flex items-center gap-2.5">
-            <span className="text-[11px] tracking-[0.18em] text-[var(--text-muted)] uppercase mr-1">
-              ALL
-            </span>
-            <button
-              type="button"
-              disabled={isLocked}
-              onClick={() => onTransposeChange(-1)}
-              aria-label="Transpose down one semitone"
-              className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] disabled:opacity-40 border border-[var(--border-subtle)] text-[var(--text-primary)] text-lg flex items-center justify-center transition"
-            >
-              −
-            </button>
-            <span className="w-6 text-center text-[15px] font-semibold text-[var(--text-primary)] tabular-nums">
-              {song.transpose > 0 ? `+${song.transpose}` : song.transpose}
-            </span>
-            <button
-              type="button"
-              disabled={isLocked}
-              onClick={() => onTransposeChange(1)}
-              aria-label="Transpose up one semitone"
-              className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] disabled:opacity-40 border border-[var(--border-subtle)] text-[var(--text-primary)] text-lg flex items-center justify-center transition"
-            >
-              +
-            </button>
-          </div>
-        </div>
-
-        <div className="border-t border-[var(--border-subtle)]" />
-
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
-              TIME SIGNATURE
-            </p>
-            <p className="text-[13px] text-[var(--text-muted)] mt-1">
-              Whole song · drives the metronome
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {(['4/4', '3/4', '6/8'] as TimeSignature[]).map((ts) => {
-              const active = song.timeSignature === ts;
-              return (
+              <div className="flex items-center gap-2.5">
+                <span className="text-[11px] tracking-[0.18em] text-[var(--text-muted)] uppercase mr-1">
+                  ALL
+                </span>
                 <button
-                  key={ts}
                   type="button"
                   disabled={isLocked}
-                  onClick={() => onTimeSignatureChange(ts)}
-                  className={`px-3.5 py-2 rounded-full text-[13px] font-semibold tabular-nums transition ${
-                    active
-                      ? 'bg-[var(--accent-amber-tint)] border border-[#E5A958] text-[var(--accent-amber-text)]'
-                      : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                  } disabled:opacity-50`}
+                  tabIndex={isSettingsCardOpen ? undefined : -1}
+                  onClick={() => onTransposeChange(-1)}
+                  aria-label="Transpose down one semitone"
+                  className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] disabled:opacity-40 border border-[var(--border-subtle)] text-[var(--text-primary)] text-lg flex items-center justify-center transition"
                 >
-                  {ts}
+                  −
                 </button>
-              );
-            })}
+                <span className="w-6 text-center text-[15px] font-semibold text-[var(--text-primary)] tabular-nums">
+                  {song.transpose > 0 ? `+${song.transpose}` : song.transpose}
+                </span>
+                <button
+                  type="button"
+                  disabled={isLocked}
+                  tabIndex={isSettingsCardOpen ? undefined : -1}
+                  onClick={() => onTransposeChange(1)}
+                  aria-label="Transpose up one semitone"
+                  className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] disabled:opacity-40 border border-[var(--border-subtle)] text-[var(--text-primary)] text-lg flex items-center justify-center transition"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-[var(--border-subtle)]" />
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-medium tracking-[0.2em] text-[var(--text-muted)] uppercase">
+                  TIME SIGNATURE
+                </p>
+                <p className="text-[13px] text-[var(--text-muted)] mt-1">
+                  Whole song · drives the metronome
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {(['4/4', '3/4', '6/8'] as TimeSignature[]).map((ts) => {
+                  const active = song.timeSignature === ts;
+                  return (
+                    <button
+                      key={ts}
+                      type="button"
+                      disabled={isLocked}
+                      tabIndex={isSettingsCardOpen ? undefined : -1}
+                      onClick={() => onTimeSignatureChange(ts)}
+                      className={`px-3.5 py-2 rounded-full text-[13px] font-semibold tabular-nums transition ${
+                        active
+                          ? 'bg-[var(--accent-amber-tint)] border border-[#E5A958] text-[var(--accent-amber-text)]'
+                          : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                      } disabled:opacity-50`}
+                    >
+                      {ts}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -485,14 +513,14 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
         >
           <span
             aria-label={synthSettings.masterEnabled ? 'Synth active' : 'Synth off'}
-            className={`w-2 h-2 rounded-full shrink-0 ${
+            className={`w-2.5 h-2.5 rounded-full shrink-0 transition-all ${
               synthSettings.masterEnabled
                 ? tab === 'synth'
-                  ? 'bg-emerald-700'
-                  : 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]'
+                  ? 'bg-emerald-300 ring-1 ring-emerald-950/35 shadow-[0_0_10px_rgba(16,185,129,0.95)]'
+                  : 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.95)] ring-2 ring-emerald-400/30'
                 : tab === 'synth'
-                ? 'bg-[#121212]/40'
-                : 'bg-[var(--text-subtle)]'
+                ? 'bg-[#121212]/35'
+                : 'bg-zinc-500/45'
             }`}
           />
           <span className="truncate">Synth &amp; Backing</span>
@@ -513,6 +541,41 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
       {/* CHORD SHEET TAB */}
       {tab === 'chords' ? (
         <div className="mt-5 space-y-4">
+          {playableSections.length > 0 && (
+            <div className="flex items-center justify-between gap-2 px-1">
+              <span className="text-[11px] font-semibold tracking-[0.18em] uppercase text-[var(--text-muted)]">
+                Sections ({playableSections.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (allSectionsCollapsed) {
+                    setCollapsedSections({});
+                  } else {
+                    const next: Record<string, boolean> = {};
+                    playableSections.forEach((s) => {
+                      next[s.id] = true;
+                    });
+                    setCollapsedSections(next);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-primary)] transition shadow-xs"
+              >
+                {allSectionsCollapsed ? (
+                  <>
+                    <ChevronDown className="w-3.5 h-3.5 text-[var(--accent-amber-text)]" />
+                    <span>Expand All</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronUp className="w-3.5 h-3.5 text-[var(--accent-amber-text)]" />
+                    <span>Collapse All</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
           {song.sections.map((section: Section) => {
             if (section.isReference) {
               const targetSection = song.sections.find(
@@ -563,6 +626,11 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
               (acc, b) => acc + (b.repeat && b.repeat > 1 ? b.repeat : 1),
               0
             );
+            const sectionStartBarNum = runningBarNum;
+            runningBarNum += secBarCount;
+            let localRunningBarNum = sectionStartBarNum;
+
+            const isCollapsed = Boolean(collapsedSections[section.id]);
             const secTranspose = (song.transpose || 0) + (section.transpose || 0);
             const isRepeatOn = Boolean(section.repeat);
             const repeatCount = Math.max(2, section.repeatCount ?? 2);
@@ -603,41 +671,90 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                           ||: :|| ×{repeatCount}
                         </span>
                       )}
-                      {section.multiPad?.enabled && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenSectionLayer(section.id, 'pad');
-                          }}
-                          className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/45 text-[10px] font-semibold text-emerald-400 hover:bg-emerald-500/25 transition"
-                        >
-                          Pad: {section.multiPad.tone} · {formatLayerBarRangeLabel(section.multiPad, secBarCount)}
-                        </button>
-                      )}
-                      {section.synth?.enabled && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenSectionLayer(section.id, 'synth');
-                          }}
-                          className="px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/45 text-[10px] font-semibold text-sky-400 hover:bg-sky-500/25 transition"
-                        >
-                          Synth: {section.synth.tone} · {formatLayerBarRangeLabel(section.synth, secBarCount)}
-                        </button>
-                      )}
-                      {section.arp?.enabled && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenSectionLayer(section.id, 'arp');
-                          }}
-                          className="px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/45 text-[10px] font-semibold text-orange-400 hover:bg-orange-500/25 transition"
-                        >
-                          Arp: {section.arp.tone} · {formatLayerBarRangeLabel(section.arp, secBarCount)}
-                        </button>
+                      {showTrackDetails && (
+                        <>
+                          {getNormalizedPadLayers(section.multiPad)
+                            .filter((l) => l.enabled)
+                            .map((layer, idx) => (
+                              <button
+                                key={layer.id || idx}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onOpenSectionLayer(section.id, 'pad');
+                                }}
+                                className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/45 text-[10px] font-semibold text-emerald-400 hover:bg-emerald-500/25 transition"
+                              >
+                                Pad {idx + 1}: {layer.tone} ·{' '}
+                                {formatLayerBarRangeLabel(layer, secBarCount)}
+                              </button>
+                            ))}
+                          {getNormalizedSynthLayers(section.synth)
+                            .filter((l) => l.enabled)
+                            .map((layer, idx) => (
+                              <button
+                                key={layer.id || idx}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onOpenSectionLayer(section.id, 'synth');
+                                }}
+                                className="px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/45 text-[10px] font-semibold text-sky-400 hover:bg-sky-500/25 transition"
+                              >
+                                Synth {idx + 1}: {layer.tone} ·{' '}
+                                {formatLayerBarRangeLabel(layer, secBarCount)}
+                              </button>
+                            ))}
+                          {getNormalizedArpLayers(section.arp)
+                            .filter((l) => l.enabled)
+                            .map((layer, idx) => (
+                              <button
+                                key={layer.id || idx}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onOpenSectionLayer(section.id, 'arp');
+                                }}
+                                className="px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/45 text-[10px] font-semibold text-orange-400 hover:bg-orange-500/25 transition"
+                              >
+                                Arp {idx + 1}: {layer.tone} ·{' '}
+                                {formatLayerBarRangeLabel(layer, secBarCount)}
+                              </button>
+                            ))}
+                          {section.drums?.enabled &&
+                            getNormalizedDrumLayers(section.drums)
+                              .filter((l) => l.enabled)
+                              .map((layer, idx) => (
+                                <button
+                                  key={layer.id || idx}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenSectionLayer(section.id, 'drums');
+                                  }}
+                                  className="px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/45 text-[10px] font-semibold text-rose-400 hover:bg-rose-500/25 transition"
+                                >
+                                  Drum {idx + 1}: {layer.kit} · {layer.pattern} ·{' '}
+                                  {formatLayerBarRangeLabel(layer, secBarCount)}
+                                </button>
+                              ))}
+                          {section.fx?.enabled &&
+                            getNormalizedFxLayers(section.fx)
+                              .filter((fx) => fx.enabled)
+                              .map((fx, idx) => (
+                                <button
+                                  key={fx.id || idx}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenSectionLayer(section.id, 'fx');
+                                  }}
+                                  className="px-2 py-0.5 rounded-full bg-fuchsia-500/15 border border-fuchsia-500/45 text-[10px] font-semibold text-fuchsia-400 hover:bg-fuchsia-500/25 transition"
+                                >
+                                  FX {idx + 1}: {fx.effectType} · B{fx.startBar}:{fx.startBeat} ({fx.durationBars}b)
+                                </button>
+                              ))}
+                        </>
                       )}
                     </div>
                     <p className="text-[13px] text-[var(--text-muted)] mt-0.5 tabular-nums">
@@ -646,7 +763,7 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-1 relative">
+                  <div className="flex items-center gap-1 relative shrink-0">
                     <button
                       type="button"
                       onClick={() => onPlaySection(section.id)}
@@ -676,6 +793,26 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                       className="w-9 h-9 rounded-full hover:bg-[var(--bg-elevated)] disabled:opacity-35 text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center transition"
                     >
                       <MoreVertical className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCollapsedSections((prev) => ({
+                          ...prev,
+                          [section.id]: !prev[section.id],
+                        }))
+                      }
+                      aria-expanded={!isCollapsed}
+                      aria-label={
+                        isCollapsed ? `Expand ${section.name}` : `Collapse ${section.name}`
+                      }
+                      className="w-8 h-8 rounded-full bg-[var(--bg-recessed)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center transition"
+                    >
+                      {isCollapsed ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronUp className="w-4 h-4" />
+                      )}
                     </button>
 
                     {activeSectionMenuId === section.id && (
@@ -732,192 +869,209 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                   </div>
                 </div>
 
-                {/* 4-column Bar Grid */}
-                <div className="mt-4 grid grid-cols-4 gap-2.5">
-                  {section.bars.map((bar: Bar, barIdx: number) => {
-                    const barNum = runningBarNum + 1;
-                    const repeats = bar.repeat && bar.repeat > 1 ? bar.repeat : 1;
-                    runningBarNum += repeats;
+                {/* Collapsible Section Body (4-column Bar Grid + Repeat Control) */}
+                <div
+                  aria-hidden={isCollapsed}
+                  className={`grid transition-[grid-template-rows,opacity] duration-250 ease-in-out ${
+                    isCollapsed
+                      ? 'grid-rows-[0fr] opacity-0 pointer-events-none'
+                      : 'grid-rows-[1fr] opacity-100'
+                  }`}
+                >
+                  <div className="min-h-0 overflow-hidden">
+                    {/* 4-column Bar Grid */}
+                    <div className="mt-4 grid grid-cols-4 gap-2.5">
+                      {section.bars.map((bar: Bar, barIdx: number) => {
+                        const barNum = localRunningBarNum + 1;
+                        const repeats = bar.repeat && bar.repeat > 1 ? bar.repeat : 1;
+                        localRunningBarNum += repeats;
 
-                    const isFirstInRepeat = isRepeatOn && barIdx === 0;
-                    const isLastInRepeat = isRepeatOn && barIdx === section.bars.length - 1;
+                        const isFirstInRepeat = isRepeatOn && barIdx === 0;
+                        const isLastInRepeat = isRepeatOn && barIdx === section.bars.length - 1;
 
-                    const isBarActive = isPlaying && activeBarId === bar.id;
-                    const isSplit = hasBeatSplits(bar);
-                    const displayChord = formatBarChordsSummary(bar, secTranspose, displayKey);
+                        const isBarActive = isPlaying && activeBarId === bar.id;
+                        const isSplit = hasBeatSplits(bar);
+                        const displayChord = formatBarChordsSummary(bar, secTranspose, displayKey);
 
-                    return (
-                      <button
-                        key={bar.id}
-                        ref={isBarActive ? activeBarRef : undefined}
-                        type="button"
-                        disabled={isLocked}
-                        onClick={() => onOpenBarEditor(section.id, bar.id)}
-                        className={`relative min-h-[82px] rounded-2xl border p-2.5 flex flex-col items-center justify-center transition text-center ${
-                          isBarActive
-                            ? 'bg-[var(--accent-amber-tint-strong)] border-[#E5A958] ring-2 ring-[#E5A958]/35'
-                            : 'bg-[var(--bg-recessed)] hover:bg-[var(--bg-bar-hover)] border-[var(--border-subtle)]'
-                        } disabled:cursor-default`}
-                      >
-                        <span className="absolute top-2 left-2.5 flex items-center gap-1 text-[11px] font-medium text-[var(--text-subtle)] tabular-nums">
-                          <span>{barNum}</span>
-                          {isFirstInRepeat && (
-                            <span className="font-mono text-[11px] font-bold text-[var(--accent-amber-text)]">
-                              ||:
+                        return (
+                          <button
+                            key={bar.id}
+                            ref={isBarActive && !isCollapsed ? activeBarRef : undefined}
+                            type="button"
+                            disabled={isLocked}
+                            tabIndex={isCollapsed ? -1 : undefined}
+                            onClick={() => onOpenBarEditor(section.id, bar.id)}
+                            className={`relative min-h-[82px] rounded-2xl border p-2.5 flex flex-col items-center justify-center transition text-center ${
+                              isBarActive
+                                ? 'bg-[var(--accent-amber-tint-strong)] border-[#E5A958] ring-2 ring-[#E5A958]/35'
+                                : 'bg-[var(--bg-recessed)] hover:bg-[var(--bg-bar-hover)] border-[var(--border-subtle)]'
+                            } disabled:cursor-default`}
+                          >
+                            <span className="absolute top-2 left-2.5 flex items-center gap-1 text-[11px] font-medium text-[var(--text-subtle)] tabular-nums">
+                              <span>{barNum}</span>
+                              {isFirstInRepeat && (
+                                <span className="font-mono text-[11px] font-bold text-[var(--accent-amber-text)]">
+                                  ||:
+                                </span>
+                              )}
                             </span>
-                          )}
-                        </span>
 
-                        {(repeats > 1 || isLastInRepeat) && (
-                          <span className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-semibold text-[var(--accent-amber-text)] tabular-nums">
-                            {repeats > 1 && <span>×{repeats}</span>}
-                            {isLastInRepeat && (
-                              <span className="font-mono text-[11px] font-bold">
-                                :||
+                            {(repeats > 1 || isLastInRepeat) && (
+                              <span className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-semibold text-[var(--accent-amber-text)] tabular-nums">
+                                {repeats > 1 && <span>×{repeats}</span>}
+                                {isLastInRepeat && (
+                                  <span className="font-mono text-[11px] font-bold">
+                                    :||
+                                  </span>
+                                )}
                               </span>
                             )}
-                          </span>
-                        )}
 
-                        <span
-                          className={`font-serif-display ${
-                            isSplit ? 'text-[14px] sm:text-[16px]' : 'text-[18px] sm:text-[20px]'
-                          } font-semibold mt-1 leading-tight max-w-full truncate ${
-                            isBarActive ? 'text-[var(--accent-amber-text)]' : 'text-[var(--text-primary)]'
-                          }`}
-                        >
-                          {displayChord}
-                        </span>
+                            <span
+                              className={`font-serif-display ${
+                                isSplit ? 'text-[14px] sm:text-[16px]' : 'text-[18px] sm:text-[20px]'
+                              } font-semibold mt-1 leading-tight max-w-full truncate ${
+                                isBarActive ? 'text-[var(--accent-amber-text)]' : 'text-[var(--text-primary)]'
+                              }`}
+                            >
+                              {displayChord}
+                            </span>
 
-                        {bar.lyrics && (
-                          <span className="text-[10px] font-sinhala text-[var(--text-muted)] mt-1 truncate max-w-full">
-                            {bar.lyrics}
-                          </span>
-                        )}
+                            {bar.lyrics && (
+                              <span className="text-[10px] font-sinhala text-[var(--text-muted)] mt-1 truncate max-w-full">
+                                {bar.lyrics}
+                              </span>
+                            )}
 
-                        {(bar.cue || bar.voiceCountLocked) && (
-                          <span className="text-[10px] text-[var(--accent-amber-text)] mt-0.5 truncate max-w-full">
-                            {bar.cue ? bar.cue : 'count'}
-                            {isLastInRepeat && passPrintBadge ? ` ${passPrintBadge}` : ''}
-                          </span>
-                        )}
+                            {(bar.cue || bar.voiceCountLocked) && (
+                              <span className="text-[10px] text-[var(--accent-amber-text)] mt-0.5 truncate max-w-full">
+                                {bar.cue ? bar.cue : 'count'}
+                                {isLastInRepeat && passPrintBadge ? ` ${passPrintBadge}` : ''}
+                              </span>
+                            )}
 
-                        {bar.meter && bar.meter !== song.timeSignature && (
-                          <span className="text-[9px] text-[var(--accent-amber-text)] mt-0.5 tabular-nums">
-                            {parseMeterBeats(bar.meter)}b
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                            {bar.meter && bar.meter !== song.timeSignature && (
+                              <span className="text-[9px] text-[var(--accent-amber-text)] mt-0.5 tabular-nums">
+                                {parseMeterBeats(bar.meter)}b
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                {/* Per-Section Repeat ||: :|| Control & Last-Bar Voice Count Selector */}
-                <div className="mt-3.5 pt-3 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={isLocked}
-                      onClick={() =>
-                        onUpdateSectionRepeat(section.id, {
-                          repeat: !isRepeatOn,
-                          repeatCount: !isRepeatOn
-                            ? Math.max(2, section.repeatCount ?? 2)
-                            : section.repeatCount,
-                          lastBarCuePassRule: section.lastBarCuePassRule ?? 'all',
-                        })
-                      }
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition disabled:opacity-40 ${
-                        isRepeatOn
-                          ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
-                          : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                      }`}
-                    >
-                      <Repeat className="w-3.5 h-3.5" />
-                      <span>Repeat ||: :||</span>
-                    </button>
-
-                    {isRepeatOn && (
-                      <div className="inline-flex items-center gap-1 px-1.5 py-1 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)]">
+                    {/* Per-Section Repeat ||: :|| Control & Last-Bar Voice Count Selector */}
+                    <div className="mt-3.5 pt-3 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2.5">
+                      <div className="flex flex-wrap items-center gap-2">
                         <button
                           type="button"
-                          disabled={isLocked || repeatCount <= 2}
-                          onClick={() => {
-                            const next = Math.max(2, repeatCount - 1);
-                            const nextRule =
-                              typeof passRule === 'number' && passRule > next ? 'last' : passRule;
-                            onUpdateSectionRepeat(section.id, {
-                              repeatCount: next,
-                              lastBarCuePassRule: nextRule,
-                            });
-                          }}
-                          aria-label="Decrease section repeats"
-                          className="w-6 h-6 rounded-lg hover:bg-[var(--bg-elevated)] disabled:opacity-35 text-[var(--text-primary)] text-xs font-bold flex items-center justify-center"
-                        >
-                          −
-                        </button>
-                        <span className="px-1.5 text-xs font-bold text-[var(--accent-amber-text)] tabular-nums">
-                          ×{repeatCount}
-                        </span>
-                        <button
-                          type="button"
-                          disabled={isLocked || repeatCount >= 8}
+                          disabled={isLocked}
+                          tabIndex={isCollapsed ? -1 : undefined}
                           onClick={() =>
                             onUpdateSectionRepeat(section.id, {
-                              repeatCount: Math.min(8, repeatCount + 1),
+                              repeat: !isRepeatOn,
+                              repeatCount: !isRepeatOn
+                                ? Math.max(2, section.repeatCount ?? 2)
+                                : section.repeatCount,
+                              lastBarCuePassRule: section.lastBarCuePassRule ?? 'all',
                             })
                           }
-                          aria-label="Increase section repeats"
-                          className="w-6 h-6 rounded-lg hover:bg-[var(--bg-elevated)] disabled:opacity-35 text-[var(--text-primary)] text-xs font-bold flex items-center justify-center"
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition disabled:opacity-40 ${
+                            isRepeatOn
+                              ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                              : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                          }`}
                         >
-                          +
+                          <Repeat className="w-3.5 h-3.5" />
+                          <span>Repeat ||: :||</span>
                         </button>
-                      </div>
-                    )}
-                  </div>
 
-                  {isRepeatOn && (
-                    <div className="flex items-center gap-2 min-w-0 max-w-full">
-                      <label
-                        htmlFor={`pass-rule-${section.id}`}
-                        className="text-[10px] font-medium tracking-[0.14em] uppercase text-[var(--text-muted)] whitespace-nowrap"
-                      >
-                        Last-bar cue
-                      </label>
-                      <select
-                        id={`pass-rule-${section.id}`}
-                        disabled={isLocked}
-                        value={selectRuleValue}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const nextRule: LastBarCuePassRule =
-                            val === 'all' || val === 'first' || val === 'last'
-                              ? val
-                              : Number(val);
-                          onUpdateSectionRepeat(section.id, {
-                            lastBarCuePassRule: nextRule,
-                          });
-                        }}
-                        className="h-8 px-2.5 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] focus:border-[#E5A958] focus:outline-none disabled:opacity-45"
-                      >
-                        <option value="all">All times</option>
-                        <option value="first">1st time only</option>
-                        <option value="last">
-                          {repeatCount === 2
-                            ? '2nd time only (Last time)'
-                            : `${formatPassOrdinal(repeatCount)} time only (Last time)`}
-                        </option>
-                        {repeatCount > 2 &&
-                          Array.from({ length: repeatCount }, (_, i) => i + 1)
-                            .filter((p) => p > 1 && p < repeatCount)
-                            .map((passNum) => (
-                              <option key={passNum} value={String(passNum)}>
-                                {formatPassOrdinal(passNum)} pass only
-                              </option>
-                            ))}
-                      </select>
+                        {isRepeatOn && (
+                          <div className="inline-flex items-center gap-1 px-1.5 py-1 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)]">
+                            <button
+                              type="button"
+                              disabled={isLocked || repeatCount <= 2}
+                              tabIndex={isCollapsed ? -1 : undefined}
+                              onClick={() => {
+                                const next = Math.max(2, repeatCount - 1);
+                                const nextRule =
+                                  typeof passRule === 'number' && passRule > next ? 'last' : passRule;
+                                onUpdateSectionRepeat(section.id, {
+                                  repeatCount: next,
+                                  lastBarCuePassRule: nextRule,
+                                });
+                              }}
+                              aria-label="Decrease section repeats"
+                              className="w-6 h-6 rounded-lg hover:bg-[var(--bg-elevated)] disabled:opacity-35 text-[var(--text-primary)] text-xs font-bold flex items-center justify-center"
+                            >
+                              −
+                            </button>
+                            <span className="px-1.5 text-xs font-bold text-[var(--accent-amber-text)] tabular-nums">
+                              ×{repeatCount}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={isLocked || repeatCount >= 8}
+                              tabIndex={isCollapsed ? -1 : undefined}
+                              onClick={() =>
+                                onUpdateSectionRepeat(section.id, {
+                                  repeatCount: Math.min(8, repeatCount + 1),
+                                })
+                              }
+                              aria-label="Increase section repeats"
+                              className="w-6 h-6 rounded-lg hover:bg-[var(--bg-elevated)] disabled:opacity-35 text-[var(--text-primary)] text-xs font-bold flex items-center justify-center"
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {isRepeatOn && (
+                        <div className="flex items-center gap-2 min-w-0 max-w-full">
+                          <label
+                            htmlFor={`pass-rule-${section.id}`}
+                            className="text-[10px] font-medium tracking-[0.14em] uppercase text-[var(--text-muted)] whitespace-nowrap"
+                          >
+                            Last-bar cue
+                          </label>
+                          <select
+                            id={`pass-rule-${section.id}`}
+                            disabled={isLocked}
+                            tabIndex={isCollapsed ? -1 : undefined}
+                            value={selectRuleValue}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const nextRule: LastBarCuePassRule =
+                                val === 'all' || val === 'first' || val === 'last'
+                                  ? val
+                                  : Number(val);
+                              onUpdateSectionRepeat(section.id, {
+                                lastBarCuePassRule: nextRule,
+                              });
+                            }}
+                            className="h-8 px-2.5 rounded-xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] focus:border-[#E5A958] focus:outline-none disabled:opacity-45"
+                          >
+                            <option value="all">All times</option>
+                            <option value="first">1st time only</option>
+                            <option value="last">
+                              {repeatCount === 2
+                                ? '2nd time only (Last time)'
+                                : `${formatPassOrdinal(repeatCount)} time only (Last time)`}
+                            </option>
+                            {repeatCount > 2 &&
+                              Array.from({ length: repeatCount }, (_, i) => i + 1)
+                                .filter((p) => p > 1 && p < repeatCount)
+                                .map((passNum) => (
+                                  <option key={passNum} value={String(passNum)}>
+                                    {formatPassOrdinal(passNum)} pass only
+                                  </option>
+                                ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               </section>
             );
@@ -991,6 +1145,7 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
           onUpdateSynthSettings={onUpdateSynthSettings}
           onSeekToBarId={onSeekToBarId}
           onOpenSectionLayer={onOpenSectionLayer}
+          onOpenExportAudio={onOpenExportAudio}
         />
       ) : (
         /* LYRICS TAB */

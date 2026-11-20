@@ -79,7 +79,6 @@ export const PersistentPlayBar: React.FC<PersistentPlayBarProps> = ({
             type="button"
             onClick={onToggleChordAudio}
             aria-label={chordAudioEnabled ? 'Mute chord synth audio' : 'Enable chord synth audio'}
-            title={chordAudioEnabled ? 'Chord synth ON' : 'Chord synth OFF'}
             className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border flex items-center justify-center transition active:scale-95 ${
               chordAudioEnabled
                 ? 'bg-[var(--accent-amber-tint)] border-[#E5A958]/70 text-[var(--accent-amber-text)]'

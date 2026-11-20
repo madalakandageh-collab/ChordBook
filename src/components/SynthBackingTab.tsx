@@ -1,17 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   AudioWaveform,
-  Check,
+  Disc3,
   Download,
-  Loader2,
   Power,
   Sliders,
   Sparkles,
   Volume2,
   VolumeX,
   Waves,
+  Zap,
 } from 'lucide-react';
-import { exportFullProjectMixWav } from '../audio/synthEngine';
 import type {
   Bar,
   MetronomeSettings,
@@ -21,6 +20,11 @@ import type {
 } from '../types';
 import {
   formatBarChordsSummary,
+  getNormalizedArpLayers,
+  getNormalizedDrumLayers,
+  getNormalizedFxLayers,
+  getNormalizedPadLayers,
+  getNormalizedSynthLayers,
   getSectionTotalBars,
   hasBeatSplits,
   transposeKey,
@@ -40,6 +44,7 @@ interface SynthBackingTabProps {
   onUpdateSynthSettings: (next: SynthBackingSettings) => void;
   onSeekToBarId: (sectionId: string, barId: string) => void;
   onOpenSectionLayer: (sectionId: string, layer: SectionLayerType) => void;
+  onOpenExportAudio: () => void;
 }
 
 function formatPanLabel(pan: number): string {
@@ -61,13 +66,8 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
   onUpdateSynthSettings,
   onSeekToBarId,
   onOpenSectionLayer,
+  onOpenExportAudio,
 }) => {
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
-  const [exportStage, setExportStage] = useState('');
-  const [exportDoneName, setExportDoneName] = useState<string | null>(null);
-  const [exportError, setExportError] = useState<string | null>(null);
-
   const activeMirrorBarRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -78,45 +78,15 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
 
   const displayKey = transposeKey(song.key, song.transpose || 0);
   const masterOn = synthSettings.masterEnabled;
+  const showTrackDetails = synthSettings.showTrackDetailsInSections ?? true;
+  const globalDrumsOn = synthSettings.drums?.enabled ?? true;
+  const globalFxOn = synthSettings.fx?.enabled ?? true;
+  const padBusActive = masterOn && !synthSettings.pad.muted;
+  const synthBusActive = masterOn && !synthSettings.synth.muted;
+  const arpBusActive = masterOn && !synthSettings.arp.muted;
+  const drumsBusActive = masterOn && globalDrumsOn && !synthSettings.drums?.muted;
+  const fxBusActive = masterOn && globalFxOn && !synthSettings.fx?.muted;
   const playableSections = song.sections.filter((sec) => !sec.isReference);
-
-  const handleExportFullMixWav = async () => {
-    if (isExporting) return;
-    setIsExporting(true);
-    setExportError(null);
-    setExportDoneName(null);
-    setExportProgress(5);
-    setExportStage('Preparing Tone.Offline engine...');
-
-    try {
-      const { blob, filename } = await exportFullProjectMixWav({
-        song,
-        metronomeSettings,
-        synthSettings,
-        onProgress: (pct, stage) => {
-          setExportProgress(pct);
-          setExportStage(stage);
-        },
-      });
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-
-      setExportDoneName(filename);
-    } catch (err) {
-      setExportError(
-        err instanceof Error ? err.message : 'Unable to export full mix WAV file.'
-      );
-    } finally {
-      setIsExporting(false);
-    }
-  };
 
   let runningBarNum = 0;
 
@@ -124,41 +94,34 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
     <div className="mt-5 space-y-4">
       {/* 1. Master Power Switch Card */}
       <div
-        className={`rounded-3xl border p-4 sm:p-5 transition shadow-xs ${
+        className={`rounded-3xl border p-4 sm:p-5 transition-all duration-200 shadow-xs ${
           masterOn
-            ? 'bg-[var(--bg-panel)] border-[#E5A958]/70'
+            ? 'bg-[var(--bg-panel)] border-emerald-500/60 shadow-[0_0_24px_rgba(16,185,129,0.12)]'
             : 'bg-[var(--bg-panel)] border-[var(--border-subtle)]'
         }`}
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div
-              className={`w-11 h-11 rounded-2xl flex items-center justify-center border transition ${
+              className={`w-11 h-11 rounded-2xl flex items-center justify-center border transition-all duration-200 ${
                 masterOn
-                  ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-400'
-                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)]'
+                  ? 'bg-emerald-500/20 border-emerald-400/75 text-emerald-300 shadow-[0_0_16px_rgba(52,211,153,0.45)]'
+                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-55 shadow-none'
               }`}
             >
               <Power className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-[var(--text-primary)]">
-                  Synth &amp; Backing: {masterOn ? 'ON' : 'OFF'}
-                </h2>
-                <span
-                  className={`inline-block w-2.5 h-2.5 rounded-full ${
-                    masterOn
-                      ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.75)]'
-                      : 'bg-[var(--text-subtle)]'
-                  }`}
-                />
-              </div>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                {masterOn
-                  ? 'Tap Green (Multi-Pad), Blue (Synth), or Orange (Arp) section dots to configure per-section tones & bar ranges'
-                  : 'Engine bypassed & disconnected to save CPU · Chord Sheet, Metronome, Cues & WAV Export remain active'}
-              </p>
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-base font-bold text-[var(--text-primary)]">
+                Synth &amp; Backing
+              </h2>
+              <span
+                className={`inline-block w-3 h-3 rounded-full transition-all duration-200 ${
+                  masterOn
+                    ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.95),0_0_4px_rgba(167,243,208,0.95)] ring-2 ring-emerald-400/35'
+                    : 'bg-zinc-600/50 border border-zinc-500/30 opacity-55 shadow-none'
+                }`}
+              />
             </div>
           </div>
 
@@ -172,12 +135,19 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
                 masterEnabled: !masterOn,
               })
             }
-            className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-full border text-xs font-bold tracking-wider uppercase transition ${
+            className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-full border text-xs font-bold tracking-wider uppercase transition-all duration-200 ${
               masterOn
-                ? 'bg-emerald-500 text-[#0B1612] border-emerald-400 shadow-sm'
-                : 'bg-[var(--bg-recessed)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]'
+                ? 'bg-emerald-500 text-[#071912] border-emerald-300 shadow-[0_0_18px_rgba(52,211,153,0.55)]'
+                : 'bg-[var(--bg-recessed)] text-[var(--text-muted)] border-[var(--border-subtle)] opacity-75 hover:text-[var(--text-primary)] shadow-none'
             }`}
           >
+            <span
+              className={`w-2 h-2 rounded-full transition-all ${
+                masterOn
+                  ? 'bg-white shadow-[0_0_8px_#ffffff]'
+                  : 'bg-zinc-500/50 shadow-none'
+              }`}
+            />
             <span>{masterOn ? 'ON' : 'OFF'}</span>
             <span
               className={`w-9 h-5 rounded-full p-0.5 flex items-center transition ${
@@ -187,6 +157,49 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
               <span
                 className={`w-4 h-4 rounded-full bg-white shadow-xs transition-transform ${
                   masterOn ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </span>
+          </button>
+        </div>
+
+        {/* Toggle Switch: Show Track Details in Sections */}
+        <div className="mt-3.5 pt-3.5 border-t border-[var(--border-subtle)]/70 flex items-center justify-between gap-3">
+          <span className="text-xs font-semibold text-[var(--text-primary)]">
+            Show Track Details in Sections
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showTrackDetails}
+            onClick={() =>
+              onUpdateSynthSettings({
+                ...synthSettings,
+                showTrackDetailsInSections: !showTrackDetails,
+              })
+            }
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold tracking-wider uppercase transition-all duration-200 shrink-0 ${
+              showTrackDetails
+                ? 'bg-emerald-500/15 border-emerald-400/70 text-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.3)]'
+                : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-75 shadow-none'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full transition-all ${
+                showTrackDetails
+                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.95)]'
+                  : 'bg-zinc-500/45 shadow-none'
+              }`}
+            />
+            <span>{showTrackDetails ? 'ON' : 'OFF'}</span>
+            <span
+              className={`w-8 h-4 rounded-full p-0.5 flex items-center transition ${
+                showTrackDetails ? 'bg-emerald-500' : 'bg-[var(--border-subtle)]'
+              }`}
+            >
+              <span
+                className={`w-3 h-3 rounded-full bg-white shadow-xs transition-transform ${
+                  showTrackDetails ? 'translate-x-4' : 'translate-x-0'
                 }`}
               />
             </span>
@@ -202,7 +215,7 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
               LIVE CHORD SHEET MIRROR
             </p>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">
-              Tap Green / Blue / Orange dots per section · Tap any bar to jump &amp; play
+              Tap Green / Blue / Orange / Red / Purple dots per section · Tap any bar to jump &amp; play
             </p>
           </div>
           <span className="px-3 py-1 rounded-full bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] tabular-nums">
@@ -225,6 +238,15 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
 
             const secTranspose = (song.transpose || 0) + (section.transpose || 0);
             const secTotalBars = Math.max(1, getSectionTotalBars(section));
+            const activePadLayers = getNormalizedPadLayers(section.multiPad).filter((l) => l.enabled);
+            const activeSynthLayers = getNormalizedSynthLayers(section.synth).filter((l) => l.enabled);
+            const activeArpLayers = getNormalizedArpLayers(section.arp).filter((l) => l.enabled);
+            const activeDrumLayers = section.drums?.enabled
+              ? getNormalizedDrumLayers(section.drums).filter((l) => l.enabled)
+              : [];
+            const activeFxLayers = section.fx?.enabled
+              ? getNormalizedFxLayers(section.fx).filter((l) => l.enabled)
+              : [];
 
             return (
               <div key={section.id} className="space-y-1.5">
@@ -242,38 +264,64 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
                     />
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-medium">
-                    {section.multiPad?.enabled && (
-                      <button
-                        type="button"
-                        onClick={() => onOpenSectionLayer(section.id, 'pad')}
-                        className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400"
-                      >
-                        Pad: {section.multiPad.tone} (
-                        {formatLayerBarRangeLabel(section.multiPad, secTotalBars)})
-                      </button>
-                    )}
-                    {section.synth?.enabled && (
-                      <button
-                        type="button"
-                        onClick={() => onOpenSectionLayer(section.id, 'synth')}
-                        className="px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/40 text-sky-400"
-                      >
-                        Synth: {section.synth.tone} (
-                        {formatLayerBarRangeLabel(section.synth, secTotalBars)})
-                      </button>
-                    )}
-                    {section.arp?.enabled && (
-                      <button
-                        type="button"
-                        onClick={() => onOpenSectionLayer(section.id, 'arp')}
-                        className="px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/40 text-orange-400"
-                      >
-                        Arp: {section.arp.tone} (
-                        {formatLayerBarRangeLabel(section.arp, secTotalBars)})
-                      </button>
-                    )}
-                  </div>
+                  {showTrackDetails && (
+                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-medium">
+                      {activePadLayers.map((layer, idx) => (
+                        <button
+                          key={layer.id || idx}
+                          type="button"
+                          onClick={() => onOpenSectionLayer(section.id, 'pad')}
+                          className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400"
+                        >
+                          Pad {idx + 1}: {layer.tone} (
+                          {formatLayerBarRangeLabel(layer, secTotalBars)})
+                        </button>
+                      ))}
+                      {activeSynthLayers.map((layer, idx) => (
+                        <button
+                          key={layer.id || idx}
+                          type="button"
+                          onClick={() => onOpenSectionLayer(section.id, 'synth')}
+                          className="px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/40 text-sky-400"
+                        >
+                          Synth {idx + 1}: {layer.tone} (
+                          {formatLayerBarRangeLabel(layer, secTotalBars)})
+                        </button>
+                      ))}
+                      {activeArpLayers.map((layer, idx) => (
+                        <button
+                          key={layer.id || idx}
+                          type="button"
+                          onClick={() => onOpenSectionLayer(section.id, 'arp')}
+                          className="px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/40 text-orange-400"
+                        >
+                          Arp {idx + 1}: {layer.tone} (
+                          {formatLayerBarRangeLabel(layer, secTotalBars)})
+                        </button>
+                      ))}
+                      {activeDrumLayers.map((layer, idx) => (
+                        <button
+                          key={layer.id || idx}
+                          type="button"
+                          onClick={() => onOpenSectionLayer(section.id, 'drums')}
+                          className="px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-400"
+                        >
+                          Drum {idx + 1}: {layer.kit} · {layer.pattern} (
+                          {formatLayerBarRangeLabel(layer, secTotalBars)})
+                        </button>
+                      ))}
+                      {activeFxLayers.map((fx, idx) => (
+                        <button
+                          key={fx.id || idx}
+                          type="button"
+                          onClick={() => onOpenSectionLayer(section.id, 'fx')}
+                          className="px-2 py-0.5 rounded-full bg-fuchsia-500/15 border border-fuchsia-500/40 text-fuchsia-400"
+                        >
+                          FX {idx + 1}: {fx.effectType} (B{fx.startBar}:{fx.startBeat}, {fx.durationBars}b)
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-4 gap-2">
@@ -325,13 +373,25 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
         </div>
       </div>
 
-      {/* 3. Offline Sound Buses (Multi-Pad [Green] / Synthesizer [Blue] / Arpeggiator [Orange]) */}
+      {/* 3. Offline Sound Buses (Multi-Pad / Synthesizer / Arpeggiator / Drums) */}
       <div className={`space-y-3.5 transition-opacity ${masterOn ? 'opacity-100' : 'opacity-60'}`}>
         {/* Multi-Pad Bus (Green Dots) */}
-        <div className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-4 sm:p-5 space-y-4 shadow-xs">
+        <div
+          className={`rounded-3xl bg-[var(--bg-panel)] border p-4 sm:p-5 space-y-4 shadow-xs transition-all duration-200 ${
+            padBusActive
+              ? 'border-emerald-500/45 shadow-[0_0_20px_rgba(16,185,129,0.08)]'
+              : 'border-[var(--border-subtle)]'
+          }`}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center">
+              <div
+                className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all duration-200 ${
+                  padBusActive
+                    ? 'bg-emerald-500/20 border-emerald-400/70 text-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.4)]'
+                    : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-55 shadow-none'
+                }`}
+              >
                 <Waves className="w-4 h-4" />
               </div>
               <div>
@@ -339,10 +399,16 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
                   <h3 className="text-sm font-bold text-[var(--text-primary)]">
                     Multi-Pad Bus (Per-Section)
                   </h3>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.85)]" />
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full transition-all duration-200 ${
+                      padBusActive
+                        ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.95)] ring-2 ring-emerald-400/30'
+                        : 'bg-zinc-600/45 border border-zinc-500/30 opacity-55 shadow-none'
+                    }`}
+                  />
                 </div>
                 <p className="text-[11px] text-[var(--text-muted)]">
-                  Tap any section below or its green dot to set tone, pattern &amp; bar range (18 presets)
+                  Tap any section below or its green dot to stack pad layers, tones &amp; bar ranges
                 </p>
               </div>
             </div>
@@ -355,16 +421,29 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
                   pad: { ...synthSettings.pad, muted: !synthSettings.pad.muted },
                 })
               }
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200 ${
                 synthSettings.pad.muted
-                  ? 'bg-red-500/15 border-red-500/40 text-red-400'
-                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+                  ? 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-red-400/80 opacity-75 shadow-none'
+                  : padBusActive
+                  ? 'bg-emerald-500/15 border-emerald-400/70 text-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.35)]'
+                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-70 shadow-none'
               }`}
             >
+              <span
+                className={`w-2 h-2 rounded-full transition-all ${
+                  padBusActive
+                    ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.95)]'
+                    : 'bg-zinc-500/45 shadow-none'
+                }`}
+              />
               {synthSettings.pad.muted ? (
                 <VolumeX className="w-3.5 h-3.5" />
               ) : (
-                <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+                <Volume2
+                  className={`w-3.5 h-3.5 ${
+                    padBusActive ? 'text-emerald-300' : 'text-[var(--text-muted)]'
+                  }`}
+                />
               )}
               <span>{synthSettings.pad.muted ? 'Muted' : 'Active'}</span>
             </button>
@@ -372,30 +451,42 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
 
           <div className="flex flex-wrap gap-2">
             {playableSections.map((sec) => {
-              const padOn = Boolean(sec.multiPad?.enabled);
+              const activeLayers = getNormalizedPadLayers(sec.multiPad).filter((l) => l.enabled);
+              const padOn = activeLayers.length > 0;
+              const padLit = padOn && padBusActive;
               const totalBars = Math.max(1, getSectionTotalBars(sec));
               return (
                 <button
                   key={sec.id}
                   type="button"
                   onClick={() => onOpenSectionLayer(sec.id, 'pad')}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition ${
-                    padOn
-                      ? 'bg-emerald-500/10 border-emerald-500/45 text-[var(--text-primary)]'
-                      : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  className={`inline-flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-2xl border text-xs font-medium transition-all duration-200 text-left ${
+                    padLit
+                      ? 'bg-emerald-500/15 border-emerald-400/65 text-[var(--text-primary)] shadow-[0_0_12px_rgba(52,211,153,0.22)]'
+                      : padOn
+                      ? 'bg-emerald-500/5 border-emerald-500/25 text-[var(--text-muted)]'
+                      : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-75 hover:opacity-100 hover:text-[var(--text-primary)]'
                   }`}
                 >
                   <span
-                    className={`w-2 h-2 rounded-full ${
-                      padOn
-                        ? 'bg-emerald-400 shadow-[0_0_7px_rgba(52,211,153,0.9)]'
-                        : 'bg-zinc-500/55'
+                    className={`w-2 h-2 rounded-full shrink-0 transition-all ${
+                      padLit
+                        ? 'bg-emerald-400 shadow-[0_0_9px_rgba(52,211,153,0.95)] ring-2 ring-emerald-400/30'
+                        : padOn
+                        ? 'bg-emerald-500/45 shadow-none'
+                        : 'bg-zinc-500/45 shadow-none'
                     }`}
                   />
                   <span>{sec.name}</span>
                   {padOn && (
                     <span className="text-[10px] text-emerald-400 font-semibold">
-                      · {sec.multiPad?.tone} ({formatLayerBarRangeLabel(sec.multiPad, totalBars)})
+                      ·{' '}
+                      {activeLayers
+                        .map(
+                          (l, idx) =>
+                            `${activeLayers.length > 1 ? `L${idx + 1} ` : ''}${l.tone} (${formatLayerBarRangeLabel(l, totalBars)})`
+                        )
+                        .join(' + ')}
                     </span>
                   )}
                 </button>
@@ -469,18 +560,27 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
                   },
                 })
               }
-              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition ${
+              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition-all duration-200 ${
                 synthSettings.pad.fillEmptyBars
-                  ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-400'
-                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+                  ? 'bg-emerald-500/15 border-emerald-400/70 text-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.28)]'
+                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-80 hover:opacity-100 hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] shadow-none'
               }`}
             >
-              <span className="text-left">Fill Empty Bars (Pad Only)</span>
+              <span className="inline-flex items-center gap-2 text-left">
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 transition-all ${
+                    synthSettings.pad.fillEmptyBars
+                      ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.95)]'
+                      : 'bg-zinc-500/45 shadow-none'
+                  }`}
+                />
+                <span>Fill Empty Bars (Pad Only)</span>
+              </span>
               <span
-                className={`px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase shrink-0 ${
+                className={`px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase shrink-0 transition-all ${
                   synthSettings.pad.fillEmptyBars
-                    ? 'bg-emerald-500 text-[#0B1612]'
-                    : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]'
+                    ? 'bg-emerald-500 text-[#071912] shadow-[0_0_10px_rgba(52,211,153,0.55)]'
+                    : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)] shadow-none'
                 }`}
               >
                 {synthSettings.pad.fillEmptyBars ? 'ON' : 'OFF'}
@@ -490,10 +590,22 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
         </div>
 
         {/* Synthesizer Bus (Blue Dots) */}
-        <div className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-4 sm:p-5 space-y-4 shadow-xs">
+        <div
+          className={`rounded-3xl bg-[var(--bg-panel)] border p-4 sm:p-5 space-y-4 shadow-xs transition-all duration-200 ${
+            synthBusActive
+              ? 'border-sky-500/45 shadow-[0_0_20px_rgba(56,189,248,0.08)]'
+              : 'border-[var(--border-subtle)]'
+          }`}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-sky-500/15 border border-sky-500/40 text-sky-400 flex items-center justify-center">
+              <div
+                className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all duration-200 ${
+                  synthBusActive
+                    ? 'bg-sky-500/20 border-sky-400/70 text-sky-300 shadow-[0_0_14px_rgba(56,189,248,0.4)]'
+                    : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-55 shadow-none'
+                }`}
+              >
                 <Sliders className="w-4 h-4" />
               </div>
               <div>
@@ -501,10 +613,16 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
                   <h3 className="text-sm font-bold text-[var(--text-primary)]">
                     Synthesizer Bus (Per-Section)
                   </h3>
-                  <span className="w-2 h-2 rounded-full bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.85)]" />
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full transition-all duration-200 ${
+                      synthBusActive
+                        ? 'bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.95)] ring-2 ring-sky-400/30'
+                        : 'bg-zinc-600/45 border border-zinc-500/30 opacity-55 shadow-none'
+                    }`}
+                  />
                 </div>
                 <p className="text-[11px] text-[var(--text-muted)]">
-                  Tap any section below or its blue dot to set keys, leads, basses &amp; bar range (18 presets)
+                  Tap any section below or its blue dot to layer keys, leads, basses &amp; bar ranges
                 </p>
               </div>
             </div>
@@ -517,16 +635,29 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
                   synth: { ...synthSettings.synth, muted: !synthSettings.synth.muted },
                 })
               }
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200 ${
                 synthSettings.synth.muted
-                  ? 'bg-red-500/15 border-red-500/40 text-red-400'
-                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+                  ? 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-red-400/80 opacity-75 shadow-none'
+                  : synthBusActive
+                  ? 'bg-sky-500/15 border-sky-400/70 text-sky-300 shadow-[0_0_14px_rgba(56,189,248,0.35)]'
+                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-70 shadow-none'
               }`}
             >
+              <span
+                className={`w-2 h-2 rounded-full transition-all ${
+                  synthBusActive
+                    ? 'bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.95)]'
+                    : 'bg-zinc-500/45 shadow-none'
+                }`}
+              />
               {synthSettings.synth.muted ? (
                 <VolumeX className="w-3.5 h-3.5" />
               ) : (
-                <Volume2 className="w-3.5 h-3.5 text-sky-400" />
+                <Volume2
+                  className={`w-3.5 h-3.5 ${
+                    synthBusActive ? 'text-sky-300' : 'text-[var(--text-muted)]'
+                  }`}
+                />
               )}
               <span>{synthSettings.synth.muted ? 'Muted' : 'Active'}</span>
             </button>
@@ -534,30 +665,42 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
 
           <div className="flex flex-wrap gap-2">
             {playableSections.map((sec) => {
-              const synthOn = Boolean(sec.synth?.enabled);
+              const activeLayers = getNormalizedSynthLayers(sec.synth).filter((l) => l.enabled);
+              const synthOn = activeLayers.length > 0;
+              const synthLit = synthOn && synthBusActive;
               const totalBars = Math.max(1, getSectionTotalBars(sec));
               return (
                 <button
                   key={sec.id}
                   type="button"
                   onClick={() => onOpenSectionLayer(sec.id, 'synth')}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition ${
-                    synthOn
-                      ? 'bg-sky-500/10 border-sky-500/45 text-[var(--text-primary)]'
-                      : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  className={`inline-flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-2xl border text-xs font-medium transition-all duration-200 text-left ${
+                    synthLit
+                      ? 'bg-sky-500/15 border-sky-400/65 text-[var(--text-primary)] shadow-[0_0_12px_rgba(56,189,248,0.22)]'
+                      : synthOn
+                      ? 'bg-sky-500/5 border-sky-500/25 text-[var(--text-muted)]'
+                      : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-75 hover:opacity-100 hover:text-[var(--text-primary)]'
                   }`}
                 >
                   <span
-                    className={`w-2 h-2 rounded-full ${
-                      synthOn
-                        ? 'bg-sky-400 shadow-[0_0_7px_rgba(56,189,248,0.9)]'
-                        : 'bg-zinc-500/55'
+                    className={`w-2 h-2 rounded-full shrink-0 transition-all ${
+                      synthLit
+                        ? 'bg-sky-400 shadow-[0_0_9px_rgba(56,189,248,0.95)] ring-2 ring-sky-400/30'
+                        : synthOn
+                        ? 'bg-sky-500/45 shadow-none'
+                        : 'bg-zinc-500/45 shadow-none'
                     }`}
                   />
                   <span>{sec.name}</span>
                   {synthOn && (
                     <span className="text-[10px] text-sky-400 font-semibold">
-                      · {sec.synth?.tone} ({formatLayerBarRangeLabel(sec.synth, totalBars)})
+                      ·{' '}
+                      {activeLayers
+                        .map(
+                          (l, idx) =>
+                            `${activeLayers.length > 1 ? `L${idx + 1} ` : ''}${l.tone} (${formatLayerBarRangeLabel(l, totalBars)})`
+                        )
+                        .join(' + ')}
                     </span>
                   )}
                 </button>
@@ -631,18 +774,27 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
                   },
                 })
               }
-              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition ${
+              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition-all duration-200 ${
                 synthSettings.synth.fillEmptyBars
-                  ? 'bg-sky-500/15 border-sky-500/50 text-sky-400'
-                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+                  ? 'bg-sky-500/15 border-sky-400/70 text-sky-300 shadow-[0_0_14px_rgba(56,189,248,0.28)]'
+                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-80 hover:opacity-100 hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] shadow-none'
               }`}
             >
-              <span className="text-left">Fill Empty Bars (Synth Only)</span>
+              <span className="inline-flex items-center gap-2 text-left">
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 transition-all ${
+                    synthSettings.synth.fillEmptyBars
+                      ? 'bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.95)]'
+                      : 'bg-zinc-500/45 shadow-none'
+                  }`}
+                />
+                <span>Fill Empty Bars (Synth Only)</span>
+              </span>
               <span
-                className={`px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase shrink-0 ${
+                className={`px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase shrink-0 transition-all ${
                   synthSettings.synth.fillEmptyBars
-                    ? 'bg-sky-500 text-[#071620]'
-                    : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]'
+                    ? 'bg-sky-500 text-[#071620] shadow-[0_0_10px_rgba(56,189,248,0.55)]'
+                    : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)] shadow-none'
                 }`}
               >
                 {synthSettings.synth.fillEmptyBars ? 'ON' : 'OFF'}
@@ -652,10 +804,22 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
         </div>
 
         {/* Arpeggiator Bus (Orange Dots) */}
-        <div className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-4 sm:p-5 space-y-4 shadow-xs">
+        <div
+          className={`rounded-3xl bg-[var(--bg-panel)] border p-4 sm:p-5 space-y-4 shadow-xs transition-all duration-200 ${
+            arpBusActive
+              ? 'border-orange-500/45 shadow-[0_0_20px_rgba(251,146,60,0.08)]'
+              : 'border-[var(--border-subtle)]'
+          }`}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-orange-500/15 border border-orange-500/40 text-orange-400 flex items-center justify-center">
+              <div
+                className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all duration-200 ${
+                  arpBusActive
+                    ? 'bg-orange-500/20 border-orange-400/70 text-orange-300 shadow-[0_0_14px_rgba(251,146,60,0.4)]'
+                    : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-55 shadow-none'
+                }`}
+              >
                 <Sparkles className="w-4 h-4" />
               </div>
               <div>
@@ -663,10 +827,16 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
                   <h3 className="text-sm font-bold text-[var(--text-primary)]">
                     Arpeggiator Bus (Per-Section)
                   </h3>
-                  <span className="w-2 h-2 rounded-full bg-orange-400 shadow-[0_0_6px_rgba(251,146,60,0.85)]" />
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full transition-all duration-200 ${
+                      arpBusActive
+                        ? 'bg-orange-400 shadow-[0_0_10px_rgba(251,146,60,0.95)] ring-2 ring-orange-400/30'
+                        : 'bg-zinc-600/45 border border-zinc-500/30 opacity-55 shadow-none'
+                    }`}
+                  />
                 </div>
                 <p className="text-[11px] text-[var(--text-muted)]">
-                  Tap any section below or its orange dot to set arp pattern, speed, tone &amp; bar range (18 presets)
+                  Tap any section below or its orange dot to stack arp patterns, speeds &amp; bar ranges
                 </p>
               </div>
             </div>
@@ -679,16 +849,29 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
                   arp: { ...synthSettings.arp, muted: !synthSettings.arp.muted },
                 })
               }
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200 ${
                 synthSettings.arp.muted
-                  ? 'bg-red-500/15 border-red-500/40 text-red-400'
-                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+                  ? 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-red-400/80 opacity-75 shadow-none'
+                  : arpBusActive
+                  ? 'bg-orange-500/15 border-orange-400/70 text-orange-300 shadow-[0_0_14px_rgba(251,146,60,0.35)]'
+                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-70 shadow-none'
               }`}
             >
+              <span
+                className={`w-2 h-2 rounded-full transition-all ${
+                  arpBusActive
+                    ? 'bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,0.95)]'
+                    : 'bg-zinc-500/45 shadow-none'
+                }`}
+              />
               {synthSettings.arp.muted ? (
                 <VolumeX className="w-3.5 h-3.5" />
               ) : (
-                <Volume2 className="w-3.5 h-3.5 text-orange-400" />
+                <Volume2
+                  className={`w-3.5 h-3.5 ${
+                    arpBusActive ? 'text-orange-300' : 'text-[var(--text-muted)]'
+                  }`}
+                />
               )}
               <span>{synthSettings.arp.muted ? 'Muted' : 'Active'}</span>
             </button>
@@ -696,30 +879,42 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
 
           <div className="flex flex-wrap gap-2">
             {playableSections.map((sec) => {
-              const arpOn = Boolean(sec.arp?.enabled);
+              const activeLayers = getNormalizedArpLayers(sec.arp).filter((l) => l.enabled);
+              const arpOn = activeLayers.length > 0;
+              const arpLit = arpOn && arpBusActive;
               const totalBars = Math.max(1, getSectionTotalBars(sec));
               return (
                 <button
                   key={sec.id}
                   type="button"
                   onClick={() => onOpenSectionLayer(sec.id, 'arp')}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition ${
-                    arpOn
-                      ? 'bg-orange-500/10 border-orange-500/45 text-[var(--text-primary)]'
-                      : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  className={`inline-flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-2xl border text-xs font-medium transition-all duration-200 text-left ${
+                    arpLit
+                      ? 'bg-orange-500/15 border-orange-400/65 text-[var(--text-primary)] shadow-[0_0_12px_rgba(251,146,60,0.22)]'
+                      : arpOn
+                      ? 'bg-orange-500/5 border-orange-500/25 text-[var(--text-muted)]'
+                      : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-75 hover:opacity-100 hover:text-[var(--text-primary)]'
                   }`}
                 >
                   <span
-                    className={`w-2 h-2 rounded-full ${
-                      arpOn
-                        ? 'bg-orange-400 shadow-[0_0_7px_rgba(251,146,60,0.9)]'
-                        : 'bg-zinc-500/55'
+                    className={`w-2 h-2 rounded-full shrink-0 transition-all ${
+                      arpLit
+                        ? 'bg-orange-400 shadow-[0_0_9px_rgba(251,146,60,0.95)] ring-2 ring-orange-400/30'
+                        : arpOn
+                        ? 'bg-orange-500/45 shadow-none'
+                        : 'bg-zinc-500/45 shadow-none'
                     }`}
                   />
                   <span>{sec.name}</span>
                   {arpOn && (
                     <span className="text-[10px] text-orange-400 font-semibold">
-                      · {sec.arp?.tone} ({formatLayerBarRangeLabel(sec.arp, totalBars)})
+                      ·{' '}
+                      {activeLayers
+                        .map(
+                          (l, idx) =>
+                            `${activeLayers.length > 1 ? `L${idx + 1} ` : ''}${l.tone} (${formatLayerBarRangeLabel(l, totalBars)})`
+                        )
+                        .join(' + ')}
                     </span>
                   )}
                 </button>
@@ -793,18 +988,27 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
                   },
                 })
               }
-              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition ${
+              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition-all duration-200 ${
                 synthSettings.arp.fillEmptyBars
-                  ? 'bg-orange-500/15 border-orange-500/50 text-orange-400'
-                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+                  ? 'bg-orange-500/15 border-orange-400/70 text-orange-300 shadow-[0_0_14px_rgba(251,146,60,0.28)]'
+                  : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-80 hover:opacity-100 hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] shadow-none'
               }`}
             >
-              <span className="text-left">Fill Empty Bars (Arp Only)</span>
+              <span className="inline-flex items-center gap-2 text-left">
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 transition-all ${
+                    synthSettings.arp.fillEmptyBars
+                      ? 'bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,0.95)]'
+                      : 'bg-zinc-500/45 shadow-none'
+                  }`}
+                />
+                <span>Fill Empty Bars (Arp Only)</span>
+              </span>
               <span
-                className={`px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase shrink-0 ${
+                className={`px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase shrink-0 transition-all ${
                   synthSettings.arp.fillEmptyBars
-                    ? 'bg-orange-500 text-[#1F1206]'
-                    : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]'
+                    ? 'bg-orange-500 text-[#1F1206] shadow-[0_0_10px_rgba(251,146,60,0.55)]'
+                    : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)] shadow-none'
                 }`}
               >
                 {synthSettings.arp.fillEmptyBars ? 'ON' : 'OFF'}
@@ -812,9 +1016,438 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Drums & Rhythm Bus (Red/Coral Dots) */}
+        <div
+          className={`rounded-3xl bg-[var(--bg-panel)] border p-4 sm:p-5 space-y-4 shadow-xs transition-all duration-200 ${
+            drumsBusActive
+              ? 'border-rose-500/45 shadow-[0_0_20px_rgba(244,63,94,0.08)]'
+              : globalDrumsOn
+              ? 'border-[var(--border-subtle)]'
+              : 'border-[var(--border-subtle)] opacity-75'
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div
+                className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all duration-200 ${
+                  drumsBusActive
+                    ? 'bg-rose-500/20 border-rose-400/70 text-rose-300 shadow-[0_0_14px_rgba(244,63,94,0.4)]'
+                    : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-55 shadow-none'
+                }`}
+              >
+                <Disc3 className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                    Drums &amp; Rhythm Bus (Per-Section)
+                  </h3>
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full transition-all duration-200 ${
+                      drumsBusActive
+                        ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.95)] ring-2 ring-rose-500/30'
+                        : 'bg-zinc-600/45 border border-zinc-500/30 opacity-55 shadow-none'
+                    }`}
+                  />
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  6 offline kits, 13 grooves (4/4, 3/4, 6/8 Baila &amp; Dadra) &amp; drum breaks
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Global Master Drums ON / OFF Switch */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={globalDrumsOn}
+                onClick={() =>
+                  onUpdateSynthSettings({
+                    ...synthSettings,
+                    drums: {
+                      ...(synthSettings.drums || { volumeDb: -4, pan: 0, muted: false, enabled: true }),
+                      enabled: !globalDrumsOn,
+                    },
+                  })
+                }
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold uppercase transition-all duration-200 ${
+                  globalDrumsOn
+                    ? 'bg-rose-500 border-rose-300 text-white shadow-[0_0_16px_rgba(244,63,94,0.55)]'
+                    : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-75 hover:text-[var(--text-primary)] shadow-none'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    globalDrumsOn
+                      ? 'bg-white shadow-[0_0_8px_#ffffff]'
+                      : 'bg-zinc-500/45 shadow-none'
+                  }`}
+                />
+                <span>Master Drums: {globalDrumsOn ? 'ON' : 'OFF'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateSynthSettings({
+                    ...synthSettings,
+                    drums: {
+                      ...(synthSettings.drums || { volumeDb: -4, pan: 0, muted: false, enabled: true }),
+                      muted: !synthSettings.drums?.muted,
+                    },
+                  })
+                }
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200 ${
+                  synthSettings.drums?.muted
+                    ? 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-red-400/80 opacity-75 shadow-none'
+                    : drumsBusActive
+                    ? 'bg-rose-500/15 border-rose-400/70 text-rose-300 shadow-[0_0_14px_rgba(244,63,94,0.35)]'
+                    : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-70 shadow-none'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    drumsBusActive
+                      ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.95)]'
+                      : 'bg-zinc-500/45 shadow-none'
+                  }`}
+                />
+                {synthSettings.drums?.muted ? (
+                  <VolumeX className="w-3.5 h-3.5" />
+                ) : (
+                  <Volume2
+                    className={`w-3.5 h-3.5 ${
+                      drumsBusActive ? 'text-rose-300' : 'text-[var(--text-muted)]'
+                    }`}
+                  />
+                )}
+                <span>{synthSettings.drums?.muted ? 'Muted' : 'Active'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {playableSections.map((sec) => {
+              const activeLayers = sec.drums?.enabled
+                ? getNormalizedDrumLayers(sec.drums).filter((l) => l.enabled)
+                : [];
+              const drumsOn = activeLayers.length > 0;
+              const drumsLit = drumsOn && drumsBusActive;
+              const totalBars = Math.max(1, getSectionTotalBars(sec));
+              return (
+                <button
+                  key={sec.id}
+                  type="button"
+                  onClick={() => onOpenSectionLayer(sec.id, 'drums')}
+                  className={`inline-flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-2xl border text-xs font-medium transition-all duration-200 text-left ${
+                    drumsLit
+                      ? 'bg-rose-500/15 border-rose-400/65 text-[var(--text-primary)] shadow-[0_0_12px_rgba(244,63,94,0.22)]'
+                      : drumsOn
+                      ? 'bg-rose-500/5 border-rose-500/25 text-[var(--text-muted)]'
+                      : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-75 hover:opacity-100 hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full shrink-0 transition-all ${
+                      drumsLit
+                        ? 'bg-rose-500 shadow-[0_0_9px_rgba(244,63,94,0.95)] ring-2 ring-rose-500/30'
+                        : drumsOn
+                        ? 'bg-rose-500/45 shadow-none'
+                        : 'bg-zinc-500/45 shadow-none'
+                    }`}
+                  />
+                  <span>{sec.name}</span>
+                  {drumsOn && (
+                    <span className="text-[10px] text-rose-400 font-semibold">
+                      ·{' '}
+                      {activeLayers
+                        .map(
+                          (l, idx) =>
+                            `${activeLayers.length > 1 ? `D${idx + 1} ` : ''}${l.kit} (${formatLayerBarRangeLabel(l, totalBars)})`
+                        )
+                        .join(' + ')}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-end">
+            <div>
+              <div className="flex items-center justify-between text-[11px] mb-1.5">
+                <span className="font-semibold tracking-[0.14em] uppercase text-[var(--text-muted)]">
+                  Drums Bus Volume
+                </span>
+                <span className="font-semibold text-[var(--text-primary)] tabular-nums">
+                  {formatDbLabel(synthSettings.drums?.volumeDb ?? -4)}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={-36}
+                max={6}
+                step={0.5}
+                value={synthSettings.drums?.volumeDb ?? -4}
+                onChange={(e) =>
+                  onUpdateSynthSettings({
+                    ...synthSettings,
+                    drums: {
+                      ...(synthSettings.drums || { volumeDb: -4, pan: 0, muted: false, enabled: true }),
+                      volumeDb: Number(e.target.value),
+                    },
+                  })
+                }
+                className="w-full accent-rose-500"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between text-[11px] mb-1.5">
+                <span className="font-semibold tracking-[0.14em] uppercase text-[var(--text-muted)]">
+                  Drums Bus Pan
+                </span>
+                <span className="font-semibold text-[var(--text-primary)] tabular-nums">
+                  {formatPanLabel(synthSettings.drums?.pan ?? 0)}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={-1}
+                max={1}
+                step={0.05}
+                value={synthSettings.drums?.pan ?? 0}
+                onChange={(e) =>
+                  onUpdateSynthSettings({
+                    ...synthSettings,
+                    drums: {
+                      ...(synthSettings.drums || { volumeDb: -4, pan: 0, muted: false, enabled: true }),
+                      pan: Number(e.target.value),
+                    },
+                  })
+                }
+                className="w-full accent-rose-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* FX / Risers Bus (Purple / Fuchsia Dots) */}
+        <div
+          className={`rounded-3xl bg-[var(--bg-panel)] border p-4 sm:p-5 space-y-4 shadow-xs transition-all duration-200 ${
+            fxBusActive
+              ? 'border-fuchsia-500/45 shadow-[0_0_20px_rgba(232,121,249,0.08)]'
+              : globalFxOn
+              ? 'border-[var(--border-subtle)]'
+              : 'border-[var(--border-subtle)] opacity-75'
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div
+                className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all duration-200 ${
+                  fxBusActive
+                    ? 'bg-fuchsia-500/20 border-fuchsia-400/70 text-fuchsia-300 shadow-[0_0_14px_rgba(232,121,249,0.4)]'
+                    : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-55 shadow-none'
+                }`}
+              >
+                <Zap className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                    FX / Risers Bus (Per-Section)
+                  </h3>
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full transition-all duration-200 ${
+                      fxBusActive
+                        ? 'bg-fuchsia-400 shadow-[0_0_10px_rgba(232,121,249,0.95)] ring-2 ring-fuchsia-400/30'
+                        : 'bg-zinc-600/45 border border-zinc-500/30 opacity-55 shadow-none'
+                    }`}
+                  />
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  16 offline risers, sweeps, reverse cymbals, drops &amp; textures synced to BPM &amp; meter
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={globalFxOn}
+                onClick={() =>
+                  onUpdateSynthSettings({
+                    ...synthSettings,
+                    fx: {
+                      ...(synthSettings.fx || { volumeDb: -2, pan: 0, muted: false, enabled: true }),
+                      enabled: !globalFxOn,
+                    },
+                  })
+                }
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold uppercase transition-all duration-200 ${
+                  globalFxOn
+                    ? 'bg-fuchsia-500 border-fuchsia-300 text-white shadow-[0_0_16px_rgba(232,121,249,0.55)]'
+                    : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-75 hover:text-[var(--text-primary)] shadow-none'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    globalFxOn
+                      ? 'bg-white shadow-[0_0_8px_#ffffff]'
+                      : 'bg-zinc-500/45 shadow-none'
+                  }`}
+                />
+                <span>Master FX: {globalFxOn ? 'ON' : 'OFF'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateSynthSettings({
+                    ...synthSettings,
+                    fx: {
+                      ...(synthSettings.fx || { volumeDb: -2, pan: 0, muted: false, enabled: true }),
+                      muted: !synthSettings.fx?.muted,
+                    },
+                  })
+                }
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200 ${
+                  synthSettings.fx?.muted
+                    ? 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-red-400/80 opacity-75 shadow-none'
+                    : fxBusActive
+                    ? 'bg-fuchsia-500/15 border-fuchsia-400/70 text-fuchsia-300 shadow-[0_0_14px_rgba(232,121,249,0.35)]'
+                    : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-70 shadow-none'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    fxBusActive
+                      ? 'bg-fuchsia-400 shadow-[0_0_8px_rgba(232,121,249,0.95)]'
+                      : 'bg-zinc-500/45 shadow-none'
+                  }`}
+                />
+                {synthSettings.fx?.muted ? (
+                  <VolumeX className="w-3.5 h-3.5" />
+                ) : (
+                  <Volume2
+                    className={`w-3.5 h-3.5 ${
+                      fxBusActive ? 'text-fuchsia-300' : 'text-[var(--text-muted)]'
+                    }`}
+                  />
+                )}
+                <span>{synthSettings.fx?.muted ? 'Muted' : 'Active'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {playableSections.map((sec) => {
+              const activeFx = sec.fx?.enabled
+                ? getNormalizedFxLayers(sec.fx).filter((fx) => fx.enabled)
+                : [];
+              const fxOn = activeFx.length > 0;
+              const fxLit = fxOn && fxBusActive;
+              return (
+                <button
+                  key={sec.id}
+                  type="button"
+                  onClick={() => onOpenSectionLayer(sec.id, 'fx')}
+                  className={`inline-flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-2xl border text-xs font-medium transition-all duration-200 text-left ${
+                    fxLit
+                      ? 'bg-fuchsia-500/15 border-fuchsia-400/65 text-[var(--text-primary)] shadow-[0_0_12px_rgba(232,121,249,0.22)]'
+                      : fxOn
+                      ? 'bg-fuchsia-500/5 border-fuchsia-500/25 text-[var(--text-muted)]'
+                      : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)] opacity-75 hover:opacity-100 hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full shrink-0 transition-all ${
+                      fxLit
+                        ? 'bg-fuchsia-400 shadow-[0_0_9px_rgba(232,121,249,0.95)] ring-2 ring-fuchsia-400/30'
+                        : fxOn
+                        ? 'bg-fuchsia-500/45 shadow-none'
+                        : 'bg-zinc-500/45 shadow-none'
+                    }`}
+                  />
+                  <span>{sec.name}</span>
+                  {fxOn && (
+                    <span className="text-[10px] text-fuchsia-400 font-semibold">
+                      ·{' '}
+                      {activeFx
+                        .map((fx) => `${fx.effectType} (B${fx.startBar}:${fx.startBeat}, ${fx.durationBars}b)`)
+                        .join(' + ')}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-end">
+            <div>
+              <div className="flex items-center justify-between text-[11px] mb-1.5">
+                <span className="font-semibold tracking-[0.14em] uppercase text-[var(--text-muted)]">
+                  FX Bus Volume
+                </span>
+                <span className="font-semibold text-[var(--text-primary)] tabular-nums">
+                  {formatDbLabel(synthSettings.fx?.volumeDb ?? -2)}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={-36}
+                max={6}
+                step={0.5}
+                value={synthSettings.fx?.volumeDb ?? -2}
+                onChange={(e) =>
+                  onUpdateSynthSettings({
+                    ...synthSettings,
+                    fx: {
+                      ...(synthSettings.fx || { volumeDb: -2, pan: 0, muted: false, enabled: true }),
+                      volumeDb: Number(e.target.value),
+                    },
+                  })
+                }
+                className="w-full accent-fuchsia-400"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between text-[11px] mb-1.5">
+                <span className="font-semibold tracking-[0.14em] uppercase text-[var(--text-muted)]">
+                  FX Bus Pan
+                </span>
+                <span className="font-semibold text-[var(--text-primary)] tabular-nums">
+                  {formatPanLabel(synthSettings.fx?.pan ?? 0)}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={-1}
+                max={1}
+                step={0.05}
+                value={synthSettings.fx?.pan ?? 0}
+                onChange={(e) =>
+                  onUpdateSynthSettings({
+                    ...synthSettings,
+                    fx: {
+                      ...(synthSettings.fx || { volumeDb: -2, pan: 0, muted: false, enabled: true }),
+                      pan: Number(e.target.value),
+                    },
+                  })
+                }
+                className="w-full accent-fuchsia-400"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* 4. Full-Project State 16-Bit Stereo WAV Export (Tone.Offline) */}
+      {/* 4. Full-Project Mixdown (Unified WAV / MP3 Track Selector Modal) */}
       <div className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-5 space-y-4 shadow-xs">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
@@ -823,18 +1456,69 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-[var(--text-primary)]">
-                Full-Project Mixdown (Tone.Offline)
+                Full-Project Mixdown (Tone.Offline WAV &amp; MP3)
               </h3>
               <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">
-                Captures Per-Section Multi-Pad, Synth, Arpeggiator (with Bar Ranges), Metronome Click, Voice Cues &amp; Count-in · 44.1 kHz 16-Bit Stereo WAV
+                Select any combination of Synth, Multi-Pad, Arp, Drums, FX / Risers, Click &amp; Voice Cues · Auto-named by song &amp; key
               </p>
             </div>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2 text-[11px]">
-          <span className="px-2.5 py-1 rounded-lg bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-[var(--text-primary)]">
-            Synth Engine: <strong>{masterOn ? 'ON' : 'OFF'}</strong>
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-all ${
+              masterOn
+                ? 'bg-emerald-500/10 border-emerald-500/40 text-[var(--text-primary)]'
+                : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)]'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                masterOn
+                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.95)]'
+                  : 'bg-zinc-500/45'
+              }`}
+            />
+            <span>
+              Synth Engine: <strong>{masterOn ? 'ON' : 'OFF'}</strong>
+            </span>
+          </span>
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-all ${
+              globalDrumsOn && masterOn
+                ? 'bg-rose-500/10 border-rose-500/40 text-[var(--text-primary)]'
+                : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)]'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                globalDrumsOn && masterOn
+                  ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.95)]'
+                  : 'bg-zinc-500/45'
+              }`}
+            />
+            <span>
+              Drums Master: <strong>{globalDrumsOn ? 'ON' : 'OFF'}</strong>
+            </span>
+          </span>
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-all ${
+              globalFxOn && masterOn
+                ? 'bg-fuchsia-500/10 border-fuchsia-500/40 text-[var(--text-primary)]'
+                : 'bg-[var(--bg-recessed)] border-[var(--border-subtle)] text-[var(--text-muted)]'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                globalFxOn && masterOn
+                  ? 'bg-fuchsia-400 shadow-[0_0_8px_rgba(232,121,249,0.95)]'
+                  : 'bg-zinc-500/45'
+              }`}
+            />
+            <span>
+              FX / Risers: <strong>{globalFxOn ? 'ON' : 'OFF'}</strong>
+            </span>
           </span>
           <span className="px-2.5 py-1 rounded-lg bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-[var(--text-primary)]">
             Click: <strong>{metronomeSettings.clickVolume}% ({metronomeSettings.clickBalance})</strong>
@@ -848,48 +1532,13 @@ export const SynthBackingTab: React.FC<SynthBackingTabProps> = ({
           </span>
         </div>
 
-        {isExporting && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-[var(--text-muted)]">{exportStage}</span>
-              <span className="font-semibold text-[var(--accent-amber-text)] tabular-nums">
-                {exportProgress}%
-              </span>
-            </div>
-            <div className="h-2 rounded-full bg-[var(--bg-recessed)] overflow-hidden">
-              <div
-                className="h-full bg-[#E5A958] transition-all duration-200"
-                style={{ width: `${exportProgress}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {exportDoneName && (
-          <div className="flex items-center gap-2 rounded-xl bg-emerald-500/15 border border-emerald-500/40 px-3 py-2 text-xs font-medium text-emerald-400">
-            <Check className="w-4 h-4 shrink-0" />
-            <span>Downloaded {exportDoneName}</span>
-          </div>
-        )}
-
-        {exportError && (
-          <div className="rounded-xl bg-red-500/15 border border-red-500/40 px-3 py-2 text-xs font-medium text-red-400">
-            {exportError}
-          </div>
-        )}
-
         <button
           type="button"
-          disabled={isExporting}
-          onClick={() => void handleExportFullMixWav()}
-          className="w-full h-12 rounded-2xl bg-[#E5A958] hover:bg-[#ecb66c] disabled:opacity-60 text-[#121212] font-bold text-sm flex items-center justify-center gap-2 shadow-md transition"
+          onClick={onOpenExportAudio}
+          className="w-full h-12 rounded-2xl bg-[#E5A958] hover:bg-[#ecb66c] text-[#121212] font-bold text-sm flex items-center justify-center gap-2 shadow-md transition"
         >
-          {isExporting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Download className="w-4 h-4" />
-          )}
-          <span>{isExporting ? 'Rendering Full Mix WAV...' : 'Export Full Mix (WAV)'}</span>
+          <Download className="w-4 h-4" />
+          <span>Export Full Mix (WAV / MP3)</span>
         </button>
       </div>
     </div>

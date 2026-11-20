@@ -69,22 +69,70 @@ export type SectionSynthPattern =
 
 export type BarRangeMode = 'all' | 'custom';
 
+export interface BarRange {
+  startBar: number;
+  endBar: number;
+}
+
+export interface PadLayerEntry {
+  id: string;
+  enabled: boolean;
+  pattern: SectionPadPattern;
+  tone: PadPresetId;
+  volumeDb?: number; // -24 to +6 dB, default 0
+  barRangeMode?: BarRangeMode;
+  startBar?: number;
+  endBar?: number;
+  barRanges?: BarRange[];
+}
+
 export interface SectionMultiPadConfig {
   enabled: boolean;
   pattern: SectionPadPattern;
   tone: PadPresetId;
+  volumeDb?: number;
   barRangeMode?: BarRangeMode;
   startBar?: number;
   endBar?: number;
+  barRanges?: BarRange[];
+  layers?: PadLayerEntry[];
+}
+
+export interface SynthLayerEntry {
+  id: string;
+  enabled: boolean;
+  pattern: SectionSynthPattern;
+  tone: SynthPresetId;
+  volumeDb?: number; // -24 to +6 dB, default 0
+  barRangeMode?: BarRangeMode;
+  startBar?: number;
+  endBar?: number;
+  barRanges?: BarRange[];
 }
 
 export interface SectionSynthConfig {
   enabled: boolean;
   pattern: SectionSynthPattern;
   tone: SynthPresetId;
+  volumeDb?: number;
   barRangeMode?: BarRangeMode;
   startBar?: number;
   endBar?: number;
+  barRanges?: BarRange[];
+  layers?: SynthLayerEntry[];
+}
+
+export interface ArpLayerEntry {
+  id: string;
+  enabled: boolean;
+  pattern: ArpPatternType;
+  tone: ArpPresetId;
+  subdivision?: '8n' | '16n' | '4n' | '8t';
+  volumeDb?: number; // -24 to +6 dB, default 0
+  barRangeMode?: BarRangeMode;
+  startBar?: number;
+  endBar?: number;
+  barRanges?: BarRange[];
 }
 
 export interface SectionArpConfig {
@@ -92,9 +140,113 @@ export interface SectionArpConfig {
   pattern: ArpPatternType;
   tone: ArpPresetId;
   subdivision?: '8n' | '16n' | '4n' | '8t';
+  volumeDb?: number;
   barRangeMode?: BarRangeMode;
   startBar?: number;
   endBar?: number;
+  barRanges?: BarRange[];
+  layers?: ArpLayerEntry[];
+}
+
+export type DrumKitId =
+  | 'Acoustic Pop Kit'
+  | 'Modern Studio Kit'
+  | '808 Electronic Kit'
+  | 'Vintage Analog Drum Machine'
+  | 'Baila / Sri Lankan Percussion Kit'
+  | 'Soft Brush / Ballad Kit';
+
+export type DrumPatternId =
+  | 'Straight 8th Pop'
+  | 'Driving 16th Rock'
+  | 'Half-Time Ballad'
+  | 'Upbeat Disco / Funk'
+  | '6/8 Baila Groove'
+  | '6/8 Dadra / Folk'
+  | '4/4 Sinhala Pop / Calypso'
+  | 'Tabla-Groove Fusion'
+  | 'Four-on-the-Floor Dance'
+  | 'Reggaeton / Dembow'
+  | 'Lo-Fi Chill Beat'
+  | 'Verse Groove'
+  | 'Chorus Groove';
+
+export type DrumFillFrequency = 'none' | 'every4' | 'every8' | 'last1' | 'last2';
+
+export type DrumFillStyle =
+  | 'Snare Roll Build-up'
+  | 'Tom Fill Cascade'
+  | 'Stop-Time Silence Break'
+  | 'Crash & Kick Accent'
+  | 'Baila Percussion Roll';
+
+export interface DrumLayerEntry {
+  id: string;
+  enabled: boolean;
+  kit: DrumKitId;
+  pattern: DrumPatternId;
+  volumeDb?: number; // -24 to +6 dB, default 0
+  barRangeMode?: BarRangeMode;
+  startBar?: number;
+  endBar?: number;
+  barRanges?: BarRange[];
+  fillFrequency?: DrumFillFrequency;
+  customFillBars?: number[];
+  fillStyle?: DrumFillStyle;
+}
+
+export interface SectionDrumsConfig {
+  enabled: boolean; // Section-level Master Drums ON/OFF switch (defaults false)
+  kit?: DrumKitId;
+  pattern?: DrumPatternId;
+  volumeDb?: number;
+  barRangeMode?: BarRangeMode;
+  startBar?: number;
+  endBar?: number;
+  barRanges?: BarRange[];
+  fillFrequency?: DrumFillFrequency;
+  customFillBars?: number[];
+  fillStyle?: DrumFillStyle;
+  layers?: DrumLayerEntry[];
+}
+
+export type FxCategory =
+  | 'Risers & Sweeps'
+  | 'Reverse & Swells'
+  | 'Impacts & Drops'
+  | 'Atmosphere / Textures';
+
+export type FxTypeId =
+  | 'White Noise Riser'
+  | 'Pink Noise Sweep'
+  | 'Pitch-Up Synth Riser'
+  | 'Filtered Sawtooth Sweep'
+  | 'Tension Drone Riser'
+  | 'Snare/Percussion Roll Riser'
+  | 'Reverse Cymbal'
+  | 'Reverse Reverb Swell'
+  | 'Ambient Pad Swell'
+  | 'Sub Swell'
+  | 'Sub Bass Drop'
+  | 'Boom/Cinematic Impact'
+  | 'Crash/Noise Hit'
+  | 'Downlifter / Tape Stop Effect'
+  | 'Vinyl Crackle'
+  | 'Subtle Wind/Air Texture';
+
+export interface FxLayerEntry {
+  id: string;
+  enabled: boolean;
+  effectType: FxTypeId;
+  startBar: number; // 1-based bar inside section
+  startBeat: number; // 1-based beat inside that bar
+  durationBars: number; // e.g. 0.5, 1, 2, 4, 8
+  volumeDb: number; // -24 to +6 dB
+}
+
+export interface SectionFxConfig {
+  enabled: boolean;
+  effects: FxLayerEntry[];
 }
 
 export interface Section {
@@ -110,6 +262,8 @@ export interface Section {
   multiPad?: SectionMultiPadConfig;
   synth?: SectionSynthConfig;
   arp?: SectionArpConfig;
+  drums?: SectionDrumsConfig;
+  fx?: SectionFxConfig;
 }
 
 export interface LyricSection {
@@ -201,6 +355,8 @@ export interface TimelineBar {
   sectionMultiPad?: SectionMultiPadConfig;
   sectionSynth?: SectionSynthConfig;
   sectionArp?: SectionArpConfig;
+  sectionDrums?: SectionDrumsConfig;
+  sectionFx?: SectionFxConfig;
 }
 
 export type SynthPresetId =
@@ -290,11 +446,41 @@ export interface ArpLayerConfig {
   fillEmptyBars?: boolean; // default false
 }
 
+export interface DrumBusConfig {
+  enabled: boolean; // Global Master Drums ON/OFF switch
+  volumeDb: number; // -36 to +6 dB
+  pan: number; // -1 to +1
+  muted: boolean;
+}
+
+export interface FxBusConfig {
+  enabled: boolean; // Global Master FX / Risers ON/OFF switch
+  volumeDb: number; // -36 to +6 dB
+  pan: number; // -1 to +1
+  muted: boolean;
+}
+
 export interface SynthBackingSettings {
   masterEnabled: boolean;
+  showTrackDetailsInSections?: boolean;
   synth: SynthLayerConfig;
   pad: PadLayerConfig;
   arp: ArpLayerConfig;
+  drums: DrumBusConfig;
+  fx: FxBusConfig;
 }
 
+export type AudioExportFormat = 'wav' | 'mp3';
+
+export interface WavExportTrackSelection {
+  multiPad: boolean;
+  synth: boolean;
+  arp: boolean;
+  drums: boolean;
+  fx: boolean;
+  click: boolean;
+  voiceCues: boolean;
+}
+
+export type ExportAudioTrackSelection = WavExportTrackSelection;
 

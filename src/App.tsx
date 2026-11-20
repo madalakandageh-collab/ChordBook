@@ -17,10 +17,15 @@ import { PersistentPlayBar } from './components/PersistentPlayBar';
 import { PracticePlayerScreen, PracticeSelectScreen } from './components/PracticeScreens';
 import {
   DEFAULT_SECTION_ARP,
+  DEFAULT_SECTION_DRUMS,
   DEFAULT_SECTION_MULTI_PAD,
   DEFAULT_SECTION_SYNTH,
 } from './audio/synthEngine';
-import { SectionLayerModal, type SectionLayerType } from './components/SectionMultiPadModal';
+import {
+  SectionLayerModal,
+  type SectionLayerType,
+  type SectionPreviewOptions,
+} from './components/SectionMultiPadModal';
 import {
   SheetsHomeScreen,
   type ImportedJsonPayload,
@@ -34,12 +39,15 @@ import { useRoomSync } from './hooks/useRoomSync';
 import { useWakeLock } from './hooks/useWakeLock';
 import type {
   Bar,
+  FxTypeId,
   LastBarCuePassRule,
   LyricSection,
   MetronomeSettings,
   RoomSyncState,
   ScreenName,
   SectionArpConfig,
+  SectionDrumsConfig,
+  SectionFxConfig,
   SectionMultiPadConfig,
   SectionSynthConfig,
   Setlist,
@@ -332,6 +340,9 @@ export default function App() {
       },
       onChordSchedule: (ev) => {
         synthEngineRef.current?.scheduleChord(ev);
+      },
+      onBeatSchedule: (ev) => {
+        synthEngineRef.current?.scheduleBeatFx(ev);
       },
     });
   }
@@ -1218,11 +1229,12 @@ export default function App() {
         <ExportAudioModal
           song={activeSong}
           settings={settings}
+          synthSettings={synthSettings}
           onClose={() => setShowExportAudioModal(false)}
         />
       )}
 
-      {/* Per-Section Multi-Pad / Synth / Arpeggios Popup */}
+      {/* Per-Section Multi-Pad / Synth / Arpeggios / Drums / FX Popup */}
       {sectionLayerModal &&
         activeSong &&
         (() => {
@@ -1240,6 +1252,7 @@ export default function App() {
               section={targetSec}
               initialLayer={sectionLayerModal.layer}
               songBpm={activeSong.bpm}
+              songTimeSignature={activeSong.timeSignature}
               isLocked={isLocked}
               onUpdatePad={(nextPad: SectionMultiPadConfig) => {
                 updateActiveSong((s) => ({
@@ -1265,13 +1278,51 @@ export default function App() {
                   ),
                 }));
               }}
-              onPreview={(layer) => {
-                if (layer === 'pad') {
+              onUpdateDrums={(nextDrums: SectionDrumsConfig) => {
+                updateActiveSong((s) => ({
+                  ...s,
+                  sections: s.sections.map((sec) =>
+                    sec.id === targetSec.id ? { ...sec, drums: nextDrums } : sec
+                  ),
+                }));
+              }}
+              onUpdateFx={(nextFx: SectionFxConfig) => {
+                updateActiveSong((s) => ({
+                  ...s,
+                  sections: s.sections.map((sec) =>
+                    sec.id === targetSec.id ? { ...sec, fx: nextFx } : sec
+                  ),
+                }));
+              }}
+              onPreviewFx={(opts: {
+                effectType: FxTypeId;
+                durationBars: number;
+                volumeDb: number;
+              }) => {
+                void synthEngineRef.current?.previewFx({
+                  effectType: opts.effectType,
+                  durationBars: opts.durationBars,
+                  volumeDb: opts.volumeDb,
+                  bpm: activeSong.bpm,
+                  meter: activeSong.timeSignature,
+                });
+              }}
+              onPreview={(layer: SectionLayerType, opts?: SectionPreviewOptions) => {
+                if (layer === 'fx' && opts?.effectType) {
+                  void synthEngineRef.current?.previewFx({
+                    effectType: opts.effectType,
+                    durationBars: opts.durationBars ?? 1,
+                    volumeDb: opts.volumeDb ?? 0,
+                    bpm: activeSong.bpm,
+                    meter: activeSong.timeSignature,
+                  });
+                } else if (layer === 'pad') {
                   const cfg = targetSec.multiPad || DEFAULT_SECTION_MULTI_PAD;
                   void synthEngineRef.current?.previewSectionLayer({
                     layer: 'pad',
-                    tone: cfg.tone,
-                    pattern: cfg.pattern,
+                    tone: opts?.tone || cfg.tone,
+                    pattern: opts?.pattern || cfg.pattern,
+                    volumeDb: opts?.volumeDb ?? cfg.volumeDb ?? 0,
                     chordStr: firstRealChord,
                     bpm: activeSong.bpm,
                   });
@@ -1279,18 +1330,33 @@ export default function App() {
                   const cfg = targetSec.synth || DEFAULT_SECTION_SYNTH;
                   void synthEngineRef.current?.previewSectionLayer({
                     layer: 'synth',
-                    tone: cfg.tone,
-                    pattern: cfg.pattern,
+                    tone: opts?.tone || cfg.tone,
+                    pattern: opts?.pattern || cfg.pattern,
+                    volumeDb: opts?.volumeDb ?? cfg.volumeDb ?? 0,
+                    chordStr: firstRealChord,
+                    bpm: activeSong.bpm,
+                  });
+                } else if (layer === 'arp') {
+                  const cfg = targetSec.arp || DEFAULT_SECTION_ARP;
+                  void synthEngineRef.current?.previewSectionLayer({
+                    layer: 'arp',
+                    tone: opts?.tone || cfg.tone,
+                    pattern: opts?.pattern || cfg.pattern,
+                    subdivision: opts?.subdivision || cfg.subdivision,
+                    volumeDb: opts?.volumeDb ?? cfg.volumeDb ?? 0,
                     chordStr: firstRealChord,
                     bpm: activeSong.bpm,
                   });
                 } else {
-                  const cfg = targetSec.arp || DEFAULT_SECTION_ARP;
+                  const cfg = targetSec.drums || DEFAULT_SECTION_DRUMS;
                   void synthEngineRef.current?.previewSectionLayer({
-                    layer: 'arp',
-                    tone: cfg.tone,
-                    pattern: cfg.pattern,
-                    subdivision: cfg.subdivision,
+                    layer: 'drums',
+                    tone: opts?.tone || cfg.kit || 'Acoustic Pop Kit',
+                    pattern: opts?.pattern || cfg.pattern || 'Straight 8th Pop',
+                    volumeDb: opts?.volumeDb ?? cfg.volumeDb ?? 0,
+                    fillStyle: opts?.fillStyle || cfg.fillStyle || 'Tom Fill Cascade',
+                    previewFill: Boolean(opts?.previewFill),
+                    meter: activeSong.timeSignature,
                     chordStr: firstRealChord,
                     bpm: activeSong.bpm,
                   });

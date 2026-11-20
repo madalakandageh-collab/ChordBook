@@ -1,7 +1,10 @@
 import type {
+  BarMeter,
   CustomVoiceCue,
   MetronomeSettings,
   SectionArpConfig,
+  SectionDrumsConfig,
+  SectionFxConfig,
   SectionMultiPadConfig,
   SectionSynthConfig,
   TimelineBar,
@@ -27,14 +30,34 @@ export interface ChordScheduleEvent {
   chordStr: string;
   semitones: number;
   durationSec: number;
+  barDurationSec: number;
   beatDurationSec: number;
+  beatsPerBar: number;
+  effectiveMeter: BarMeter;
   effectiveBpm: number;
+  isBarStart: boolean;
   sectionId: string;
   sectionBarNumber: number;
   sectionTotalBars: number;
   sectionMultiPad?: SectionMultiPadConfig;
   sectionSynth?: SectionSynthConfig;
   sectionArp?: SectionArpConfig;
+  sectionDrums?: SectionDrumsConfig;
+}
+
+export interface BeatScheduleEvent {
+  rawCtx: AudioContext;
+  time: number;
+  beatNum: number;
+  beatsPerBar: number;
+  beatDurationSec: number;
+  barDurationSec: number;
+  effectiveMeter: BarMeter;
+  effectiveBpm: number;
+  sectionId: string;
+  sectionBarNumber: number;
+  sectionTotalBars: number;
+  sectionFx?: SectionFxConfig;
 }
 
 export interface PlaybackCallbacks {
@@ -46,6 +69,7 @@ export interface PlaybackCallbacks {
     initialSeedChord?: { chordStr: string; semitones: number } | null
   ) => void;
   onChordSchedule?: (event: ChordScheduleEvent) => void;
+  onBeatSchedule?: (event: BeatScheduleEvent) => void;
 }
 
 /**
@@ -606,7 +630,8 @@ export class ChordbookAudioEngine {
     durationSec: number,
     beatDurationSec: number,
     effectiveBpm: number,
-    step: TimelineBar
+    step: TimelineBar,
+    isBarStart: boolean
   ): void {
     if (!this.ctx) return;
     this.callbacks.onChordSchedule?.({
@@ -615,14 +640,19 @@ export class ChordbookAudioEngine {
       chordStr,
       semitones,
       durationSec,
+      barDurationSec: beatDurationSec * step.beatsPerBar,
       beatDurationSec,
+      beatsPerBar: step.beatsPerBar,
+      effectiveMeter: step.effectiveMeter,
       effectiveBpm,
+      isBarStart,
       sectionId: step.sectionId,
       sectionBarNumber: step.sectionBarNumber,
       sectionTotalBars: step.sectionTotalBars,
       sectionMultiPad: step.sectionMultiPad,
       sectionSynth: step.sectionSynth,
       sectionArp: step.sectionArp,
+      sectionDrums: step.sectionDrums,
     });
     if (this.suppressBasicChord || !this.settings.chordAudioEnabled || this.settings.chordVolume <= 0) {
       return;
@@ -729,6 +759,21 @@ export class ChordbookAudioEngine {
         this.settings.clickBalance
       );
 
+      this.callbacks.onBeatSchedule?.({
+        rawCtx: this.ctx,
+        time: scheduledTime,
+        beatNum,
+        beatsPerBar: beatsInBar,
+        beatDurationSec,
+        barDurationSec: beatDurationSec * beatsInBar,
+        effectiveMeter: currentStep.effectiveMeter,
+        effectiveBpm,
+        sectionId: currentStep.sectionId,
+        sectionBarNumber: currentStep.sectionBarNumber,
+        sectionTotalBars: currentStep.sectionTotalBars,
+        sectionFx: currentStep.sectionFx,
+      });
+
       const totalTranspose = this.globalTranspose + currentStep.sectionTranspose;
       if (hasBeatSplits(currentStep.bar) && currentStep.bar.beatChords) {
         const beatChord = (currentStep.bar.beatChords[beatIndex] || '').trim();
@@ -746,7 +791,8 @@ export class ChordbookAudioEngine {
             beatDurationSec * holdBeats,
             beatDurationSec,
             effectiveBpm,
-            currentStep
+            currentStep,
+            beatNum === 1
           );
         } else if (beatNum === 1) {
           let emptyBeats = 1;
@@ -763,7 +809,8 @@ export class ChordbookAudioEngine {
             beatDurationSec * emptyBeats,
             beatDurationSec,
             effectiveBpm,
-            currentStep
+            currentStep,
+            true
           );
         }
       } else if (beatNum === 1) {
@@ -774,7 +821,8 @@ export class ChordbookAudioEngine {
           beatDurationSec * beatsInBar,
           beatDurationSec,
           effectiveBpm,
-          currentStep
+          currentStep,
+          true
         );
       }
 
