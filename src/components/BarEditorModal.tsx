@@ -38,6 +38,39 @@ const ROOTS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 const CHORD_TYPES = ['maj', 'min', '7', 'maj7', 'm7', 'sus2', 'sus4', 'add9', '6', '9', 'dim', 'aug', 'm7b5', '5'];
 const BAR_METERS: BarMeter[] = ['4/4', '3/4', '2/4', '6/8', '5/4', '7/8', '9/8', '12/8'];
 const BEAT_UNITS: BeatUnit[] = ['Quarter', 'Eighth', 'Dotted', 'Triplet'];
+const DEFAULT_COUNTING_PRESETS = ['1 1 1 1', '1 2 3 1', '1 2 1 2'];
+const CUSTOM_COUNTING_STORAGE_KEY = 'chordbook_custom_counting_sequences_v1';
+
+function loadCustomCountingSequences(): string[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_COUNTING_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const seen = new Set(DEFAULT_COUNTING_PRESETS);
+    const result: string[] = [];
+    for (const item of parsed) {
+      if (typeof item === 'string') {
+        const clean = item.trim().replace(/\s+/g, ' ');
+        if (clean && !seen.has(clean)) {
+          seen.add(clean);
+          result.push(clean);
+        }
+      }
+    }
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomCountingSequences(sequences: string[]): void {
+  try {
+    localStorage.setItem(CUSTOM_COUNTING_STORAGE_KEY, JSON.stringify(sequences));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
 
 function parseRootAndType(chord: string): { root: string; type: string } {
   const clean = chord.trim();
@@ -80,6 +113,9 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
   onClose,
 }) => {
   const [typingMode, setTypingMode] = useState(false);
+  const [customCountingSequences, setCustomCountingSequences] = useState<string[]>(() =>
+    loadCustomCountingSequences()
+  );
   // null = Whole Bar chord; number (0..beats-1) = Beat Split slot index
   const [activeBeatSlot, setActiveBeatSlot] = useState<number | null>(() =>
     hasBeatSplits(bar) ? 0 : null
@@ -137,6 +173,26 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
   const handleClearBeatSplits = () => {
     setActiveBeatSlot(null);
     onUpdateBar({ ...bar, beatChords: undefined });
+  };
+
+  const normalizedCustomInput = (bar.countingSystem || '').trim().replace(/\s+/g, ' ');
+  const canSaveCustomSequence =
+    normalizedCustomInput.length > 0 &&
+    !DEFAULT_COUNTING_PRESETS.includes(normalizedCustomInput) &&
+    !customCountingSequences.includes(normalizedCustomInput);
+
+  const handleSaveCustomSequence = () => {
+    if (!canSaveCustomSequence) return;
+    const next = [...customCountingSequences, normalizedCustomInput];
+    setCustomCountingSequences(next);
+    saveCustomCountingSequences(next);
+    onUpdateBar({ ...bar, countingSystem: normalizedCustomInput });
+  };
+
+  const handleRemoveCustomSequence = (patternToRemove: string) => {
+    const next = customCountingSequences.filter((p) => p !== patternToRemove);
+    setCustomCountingSequences(next);
+    saveCustomCountingSequences(next);
   };
 
   return (
@@ -599,7 +655,7 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                   Spoken 1–7 MP3 count on each of this bar&apos;s {effectiveBeats} beats
                 </p>
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {['1 1 1 1', '1 2 3 1', '1 2 1 2'].map((pattern) => {
+                  {DEFAULT_COUNTING_PRESETS.map((pattern) => {
                     const active = effectiveCounting === pattern;
                     return (
                       <button
@@ -616,16 +672,55 @@ export const BarEditorModal: React.FC<BarEditorModalProps> = ({
                       </button>
                     );
                   })}
+                  {customCountingSequences.map((pattern) => {
+                    const active = effectiveCounting === pattern;
+                    return (
+                      <div
+                        key={pattern}
+                        className={`inline-flex items-center rounded-full border transition ${
+                          active
+                            ? 'bg-[var(--accent-amber-tint)] border-[#E5A958] text-[var(--accent-amber-text)]'
+                            : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)]'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onUpdateBar({ ...bar, countingSystem: pattern })}
+                          className="pl-4 pr-1.5 py-2 text-xs font-medium tracking-[0.2em] tabular-nums"
+                        >
+                          {pattern}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCustomSequence(pattern)}
+                          aria-label={`Remove custom sequence ${pattern}`}
+                          className="pr-2.5 pl-1 py-2 text-[var(--text-muted)] hover:text-red-400 flex items-center justify-center transition"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
-                <input
-                  type="text"
-                  value={bar.countingSystem || ''}
-                  onChange={(e) =>
-                    onUpdateBar({ ...bar, countingSystem: e.target.value || undefined })
-                  }
-                  placeholder="Custom sequence (1–7), e.g. 1 2 3 4 5 6"
-                  className="w-full h-11 px-4 rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[#E5A958] focus:outline-none"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={bar.countingSystem || ''}
+                    onChange={(e) =>
+                      onUpdateBar({ ...bar, countingSystem: e.target.value || undefined })
+                    }
+                    placeholder="Custom sequence (1–7), e.g. 1 2 3 4 5 6"
+                    className="flex-1 min-w-0 h-11 px-4 rounded-2xl bg-[var(--bg-recessed)] border border-[var(--border-subtle)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] focus:border-[#E5A958] focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    disabled={!canSaveCustomSequence}
+                    onClick={handleSaveCustomSequence}
+                    className="h-11 px-4 rounded-2xl bg-[#E5A958] hover:bg-[#ecb66c] disabled:opacity-40 disabled:hover:bg-[#E5A958] text-[#121212] text-xs font-bold uppercase tracking-wider shrink-0 transition"
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
 
               {/* BAR METER */}
