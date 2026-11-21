@@ -14,7 +14,7 @@ jobs:
           node-version: 20
       - name: Install Dependencies & Build Web
         run: |
-          npm install
+          npm install --legacy-peer-deps
           npm run build
       - name: Add Android & Sync Capacitor
         run: |
