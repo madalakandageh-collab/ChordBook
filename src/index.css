@@ -78,7 +78,23 @@
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: contain;
     transition: background-color 0.2s ease, color 0.2s ease;
+    padding-top: env(safe-area-inset-top, 28px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
   }
+}
+
+/* Fix for Floating "+ New song" button overlapping with AdMob Banner */
+.fixed.bottom-4,
+.fixed.bottom-5,
+.fixed.bottom-6,
+.fixed.bottom-8 {
+  bottom: 85px !important;
+}
+
+/* Fix for Top Header overlapping with Status Bar */
+header.sticky.top-0,
+header.fixed.top-0 {
+  padding-top: env(safe-area-inset-top, 28px) !important;
 }
 
 .font-serif-display {
@@ -178,6 +194,8 @@ input[type='range'].amber-slider::-moz-range-thumb {
   body {
     background: #FFFFFF !important;
     color: #111827 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -200,18 +218,12 @@ input[type='range'].amber-slider::-moz-range-thumb {
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important;
-    width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
     padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
   }
 
-  body.printing-chord-sheet .no-print {
+  .no-print {
     display: none !important;
-  }
-
-  .pdf-two-column-flow {
-    column-count: 2 !important;
-    column-gap: 18px !important;
   }
 }
