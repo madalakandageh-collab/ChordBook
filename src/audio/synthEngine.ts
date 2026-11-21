@@ -61,6 +61,8 @@ import {
   FX_DURATION_BAR_OPTIONS,
   scheduleWebAudioFx,
 } from './fxSynth';
+import { encodeAudioBufferInBackgroundWorker } from '../utils/audioEncodeWorker';
+import { acquireWakeLock } from '../hooks/useWakeLock';
 
 export { DEFAULT_FX_ENTRY, FX_CATALOG, FX_DURATION_BAR_OPTIONS };
 
@@ -2306,8 +2308,27 @@ export class ToneSynthBackingEngine {
   private activePreviewCleanup: (() => void) | null = null;
   private activePreviewTimer: number | null = null;
 
+  private handleVisibilityChange = (): void => {
+    if (!this.isPlayingLive || !this.boundRawCtx) return;
+    const state = this.boundRawCtx.state as string;
+    if (state === 'suspended' || state === 'interrupted') {
+      void this.boundRawCtx.resume().catch(() => {});
+    }
+    try {
+      const toneCtx = Tone.getContext();
+      if ((toneCtx.state as string) !== 'running') {
+        void toneCtx.resume().catch(() => {});
+      }
+    } catch {
+      // Ignore
+    }
+  };
+
   constructor(initialSettings: SynthBackingSettings) {
     this.settings = initialSettings;
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    }
   }
 
   private ensureToneContext(rawCtx: AudioContext): void {
@@ -3155,6 +3176,9 @@ export class ToneSynthBackingEngine {
     this.isPlayingLive = false;
     this.stopActivePreview();
     this.teardownNodes();
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    }
   }
 }
 
@@ -3446,441 +3470,446 @@ export async function exportProjectAudio(options: {
 
   onProgress?.(45, 'Rendering selected stereo tracks via Tone.Offline...');
 
-  const renderedToneBuffer = await Tone.Offline(
-    () => {
-      const offlineToneCtx = Tone.getContext();
-      const rawCtx = offlineToneCtx.rawContext as OfflineAudioContext;
+  const releaseExportWakeLock = await acquireWakeLock();
+  try {
+    const renderedToneBuffer = await Tone.Offline(
+      () => {
+        const offlineToneCtx = Tone.getContext();
+        const rawCtx = offlineToneCtx.rawContext as OfflineAudioContext;
 
-      const scheduleRawVoiceBuffer = (buf: AudioBuffer | undefined, time: number) => {
-        if (!buf || metronomeSettings.voiceVolume <= 0) return;
-        const src = rawCtx.createBufferSource();
-        src.buffer = buf;
-        src.playbackRate.setValueAtTime(1.0, time);
+        const scheduleRawVoiceBuffer = (buf: AudioBuffer | undefined, time: number) => {
+          if (!buf || metronomeSettings.voiceVolume <= 0) return;
+          const src = rawCtx.createBufferSource();
+          src.buffer = buf;
+          src.playbackRate.setValueAtTime(1.0, time);
 
-        const gain = rawCtx.createGain();
-        gain.gain.setValueAtTime(
-          Math.max(0, Math.min(1.5, metronomeSettings.voiceVolume / 100)),
-          time
-        );
+          const gain = rawCtx.createGain();
+          gain.gain.setValueAtTime(
+            Math.max(0, Math.min(1.5, metronomeSettings.voiceVolume / 100)),
+            time
+          );
 
-        const panner = rawCtx.createStereoPanner();
-        panner.pan.setValueAtTime(balanceToPan(metronomeSettings.voiceBalance), time);
+          const panner = rawCtx.createStereoPanner();
+          panner.pan.setValueAtTime(balanceToPan(metronomeSettings.voiceBalance), time);
 
-        src.connect(gain);
-        gain.connect(panner);
-        panner.connect(rawCtx.destination);
-        src.start(time);
-      };
-
-      // A. Metronome Click & Voice Cues / Count-in (strictly filtered by track selection)
-      if (tracks.click || tracks.voiceCues) {
-        for (const ev of beatEvents) {
-          if (tracks.click) {
-            const activeUnit = ev.isCountIn
-              ? metronomeSettings.subdivision
-              : ev.step.bar.beatUnit || metronomeSettings.subdivision;
-
-            scheduleCubaseClick(
-              rawCtx,
-              rawCtx.destination,
-              ev.time,
-              ev.beatNum === 1,
-              false,
-              metronomeSettings.clickVolume,
-              metronomeSettings.clickBalance
-            );
-            scheduleSubdivisionClicks(
-              rawCtx,
-              rawCtx.destination,
-              ev.time,
-              ev.beatDurationSec,
-              activeUnit,
-              metronomeSettings.clickVolume,
-              metronomeSettings.clickBalance
-            );
-          }
-
-          if (!tracks.voiceCues) continue;
-
-          if (ev.isCountIn) {
-            scheduleRawVoiceBuffer(urlBuffers.get(resolveCountCueUrl(ev.beatNum)), ev.time);
-            continue;
-          }
-
-          const allowLastBarVoice = shouldTriggerBarVoiceCueAndCount(ev.step);
-
-          if (allowLastBarVoice && ev.beatNum === 1) {
-            if (ev.step.bar.customCueId) {
-              scheduleRawVoiceBuffer(customBuffers.get(ev.step.bar.customCueId), ev.time);
-            } else if (ev.step.bar.cue) {
-              const url = resolveBundledCueUrl(ev.step.bar.cue);
-              if (url) scheduleRawVoiceBuffer(urlBuffers.get(url), ev.time);
-            }
-          }
-
-          if (allowLastBarVoice && ev.step.bar.voiceCountLocked) {
-            const pattern = (ev.step.bar.countingSystem || '1 1 1 1')
-              .trim()
-              .split(/[\s,]+/)
-              .filter(Boolean);
-            const token =
-              pattern[(ev.beatNum - 1) % Math.max(1, pattern.length)] || String(ev.beatNum);
-            const parsed = parseInt(token, 10);
-            if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 7) {
-              scheduleRawVoiceBuffer(urlBuffers.get(resolveCountCueUrl(parsed)), ev.time);
-            }
-          }
-        }
-      }
-
-      // A2. Scheduled FX / Risers track (strictly filtered by tracks.fx)
-      if (renderFx && fxTriggers.length > 0) {
-        const offlineFxGain = rawCtx.createGain();
-        offlineFxGain.gain.setValueAtTime(Tone.dbToGain(fxBusCfg.volumeDb), 0);
-        const offlineFxPan = rawCtx.createStereoPanner();
-        offlineFxPan.pan.setValueAtTime(fxBusCfg.pan, 0);
-        offlineFxGain.connect(offlineFxPan);
-        offlineFxPan.connect(rawCtx.destination);
-
-        for (const fx of fxTriggers) {
-          scheduleWebAudioFx({
-            ctx: rawCtx,
-            destination: offlineFxGain,
-            effectType: fx.effectType,
-            startTime: fx.time,
-            durationSec: fx.durationSec,
-            beatDurationSec: fx.beatDurationSec,
-            volumeDb: fx.volumeDb,
-          });
-        }
-      }
-
-      // B. Multi-Layer Per-Section Synth / Multi-Pad / Arpeggiator / Drums (strictly filtered by track selection)
-      const renderPad = tracks.multiPad && !synthSettings.pad.muted;
-      const renderSynth = tracks.synth && !synthSettings.synth.muted;
-      const renderArp = tracks.arp && !synthSettings.arp.muted;
-      const renderDrums = tracks.drums && synthSettings.drums.enabled && !synthSettings.drums.muted;
-
-      if (synthSettings.masterEnabled && (renderPad || renderSynth || renderArp || renderDrums)) {
-        const synthVol = new Tone.Volume(synthSettings.synth.volumeDb);
-        synthVol.mute = synthSettings.synth.muted;
-        const synthPan = new Tone.Panner(synthSettings.synth.pan);
-        synthVol.chain(synthPan, Tone.getDestination());
-
-        const offlineSynthChains = new Map<string, { chain: ToneVoiceChain; gain: Tone.Gain }>();
-        const getOfflineSynthLayerChain = (key: string, tone: SynthPresetId, volDb = 0) => {
-          const cacheKey = `${key}::${tone}`;
-          let entry = offlineSynthChains.get(cacheKey);
-          if (!entry) {
-            const chain = createSynthChainForPreset(tone);
-            const gain = new Tone.Gain(Tone.dbToGain(volDb));
-            chain.output.chain(gain, synthVol);
-            entry = { chain, gain };
-            offlineSynthChains.set(cacheKey, entry);
-          } else {
-            entry.gain.gain.setValueAtTime(Tone.dbToGain(volDb), 0);
-          }
-          return entry.chain;
+          src.connect(gain);
+          gain.connect(panner);
+          panner.connect(rawCtx.destination);
+          src.start(time);
         };
 
-        const padFilter = new Tone.Filter(2600, 'lowpass');
-        const padVol = new Tone.Volume(synthSettings.pad.volumeDb);
-        padVol.mute = synthSettings.pad.muted;
-        const padPan = new Tone.Panner(synthSettings.pad.pan);
-        padFilter.chain(padVol, padPan, Tone.getDestination());
+        // A. Metronome Click & Voice Cues / Count-in (strictly filtered by track selection)
+        if (tracks.click || tracks.voiceCues) {
+          for (const ev of beatEvents) {
+            if (tracks.click) {
+              const activeUnit = ev.isCountIn
+                ? metronomeSettings.subdivision
+                : ev.step.bar.beatUnit || metronomeSettings.subdivision;
 
-        const offlinePadChains = new Map<string, { chain: ToneVoiceChain; gain: Tone.Gain }>();
-        const getOfflinePadLayerChain = (key: string, tone: PadPresetId, volDb = 0) => {
-          const cacheKey = `${key}::${tone}`;
-          let entry = offlinePadChains.get(cacheKey);
-          if (!entry) {
-            const chain = createPadChainForPreset(tone);
-            const gain = new Tone.Gain(Tone.dbToGain(volDb));
-            chain.output.chain(gain, padFilter);
-            entry = { chain, gain };
-            offlinePadChains.set(cacheKey, entry);
-          } else {
-            entry.gain.gain.setValueAtTime(Tone.dbToGain(volDb), 0);
-          }
-          return entry.chain;
-        };
-
-        const arpVol = new Tone.Volume(synthSettings.arp.volumeDb);
-        arpVol.mute = synthSettings.arp.muted;
-        const arpPan = new Tone.Panner(synthSettings.arp.pan);
-        arpVol.chain(arpPan, Tone.getDestination());
-
-        const offlineArpChains = new Map<string, { chain: ToneVoiceChain; gain: Tone.Gain }>();
-        const getOfflineArpLayerChain = (key: string, tone: ArpPresetId, volDb = 0) => {
-          const cacheKey = `${key}::${tone}`;
-          let entry = offlineArpChains.get(cacheKey);
-          if (!entry) {
-            const chain = createArpChainForPreset(tone);
-            const gain = new Tone.Gain(Tone.dbToGain(volDb));
-            chain.output.chain(gain, arpVol);
-            entry = { chain, gain };
-            offlineArpChains.set(cacheKey, entry);
-          } else {
-            entry.gain.gain.setValueAtTime(Tone.dbToGain(volDb), 0);
-          }
-          return entry.chain;
-        };
-
-        const drumsVol = new Tone.Volume(synthSettings.drums.volumeDb);
-        drumsVol.mute = !synthSettings.drums.enabled || synthSettings.drums.muted;
-        const drumsPan = new Tone.Panner(synthSettings.drums.pan);
-        drumsVol.chain(drumsPan, Tone.getDestination());
-
-        const offlineDrumChains = new Map<string, { chain: ToneDrumChain; gain: Tone.Gain }>();
-        const getOfflineDrumLayerChain = (key: string, kit: DrumKitId, volDb = 0) => {
-          const cacheKey = `${key}::${kit}`;
-          let entry = offlineDrumChains.get(cacheKey);
-          if (!entry) {
-            const chain = createDrumChainForKit(kit);
-            const gain = new Tone.Gain(Tone.dbToGain(volDb));
-            chain.output.chain(gain, drumsVol);
-            entry = { chain, gain };
-            offlineDrumChains.set(cacheKey, entry);
-          } else {
-            entry.gain.gain.setValueAtTime(Tone.dbToGain(volDb), 0);
-          }
-          return entry.chain;
-        };
-
-        let lastOfflinePadSectionId: string | null = null;
-        let lastOfflineSynthSectionId: string | null = null;
-        let lastOfflineArpSectionId: string | null = null;
-        const offlineArpCursors = new Map<string, number>();
-        const offlineDrumPrevWasFill = new Map<string, boolean>();
-        let offlineLastNonEmptyChord: { chordStr: string; semitones: number } | null = null;
-
-        for (const seg of chordSegments) {
-          const isEmptySeg = isEmptyChordToken(seg.chordStr);
-          if (!isEmptySeg) {
-            offlineLastNonEmptyChord = {
-              chordStr: seg.chordStr,
-              semitones: seg.semitones,
-            };
-          }
-
-          const resolveOfflineBusChord = (fillEmpty?: boolean) => {
-            if (!isEmptySeg) {
-              return { chordStr: seg.chordStr, semitones: seg.semitones };
+              scheduleCubaseClick(
+                rawCtx,
+                rawCtx.destination,
+                ev.time,
+                ev.beatNum === 1,
+                false,
+                metronomeSettings.clickVolume,
+                metronomeSettings.clickBalance
+              );
+              scheduleSubdivisionClicks(
+                rawCtx,
+                rawCtx.destination,
+                ev.time,
+                ev.beatDurationSec,
+                activeUnit,
+                metronomeSettings.clickVolume,
+                metronomeSettings.clickBalance
+              );
             }
-            if (fillEmpty && offlineLastNonEmptyChord) {
-              return offlineLastNonEmptyChord;
-            }
-            return null;
-          };
 
-          // 1. Multi-layer Synth
-          if (renderSynth) {
-            if (lastOfflineSynthSectionId !== null && lastOfflineSynthSectionId !== seg.sectionId) {
-              for (const e of offlineSynthChains.values()) e.chain.poly.releaseAll(seg.time);
-            }
-            lastOfflineSynthSectionId = seg.sectionId;
+            if (!tracks.voiceCues) continue;
 
-            const offlineSynthChord = resolveOfflineBusChord(synthSettings.synth.fillEmptyBars);
-            const synthLayers = getNormalizedSynthLayers(seg.sectionSynth);
-            let anyPlayed = false;
-
-            if (offlineSynthChord && synthLayers.length > 0) {
-              synthLayers.forEach((layer, idx) => {
-                if (!isBarInSectionLayerRange(layer, seg.sectionBarNumber, seg.sectionTotalBars)) {
-                  return;
-                }
-                anyPlayed = true;
-                const chain = getOfflineSynthLayerChain(
-                  layer.id || `synth-${idx}`,
-                  layer.tone,
-                  layer.volumeDb ?? 0
-                );
-                scheduleSectionSynthPattern(chain.poly, {
-                  chordStr: offlineSynthChord.chordStr,
-                  semitones: offlineSynthChord.semitones,
-                  time: seg.time,
-                  durationSec: seg.durationSec,
-                  beatDurationSec: seg.beatDurationSec,
-                  pattern: layer.pattern,
-                  tone: layer.tone,
-                });
-              });
+            if (ev.isCountIn) {
+              scheduleRawVoiceBuffer(urlBuffers.get(resolveCountCueUrl(ev.beatNum)), ev.time);
+              continue;
             }
-            if (!anyPlayed) {
-              for (const e of offlineSynthChains.values()) e.chain.poly.releaseAll(seg.time);
-            }
-          }
 
-          // 2. Multi-layer Multi-Pad
-          if (renderPad) {
-            if (lastOfflinePadSectionId !== null && lastOfflinePadSectionId !== seg.sectionId) {
-              for (const e of offlinePadChains.values()) e.chain.poly.releaseAll(seg.time);
-            }
-            lastOfflinePadSectionId = seg.sectionId;
+            const allowLastBarVoice = shouldTriggerBarVoiceCueAndCount(ev.step);
 
-            const offlinePadChord = resolveOfflineBusChord(synthSettings.pad.fillEmptyBars);
-            const padLayers = getNormalizedPadLayers(seg.sectionMultiPad);
-            let anyPlayed = false;
-
-            if (offlinePadChord && padLayers.length > 0) {
-              padLayers.forEach((layer, idx) => {
-                if (!isBarInSectionLayerRange(layer, seg.sectionBarNumber, seg.sectionTotalBars)) {
-                  return;
-                }
-                anyPlayed = true;
-                const chain = getOfflinePadLayerChain(
-                  layer.id || `pad-${idx}`,
-                  layer.tone,
-                  layer.volumeDb ?? 0
-                );
-                scheduleSectionPadPattern(chain.poly, {
-                  chordStr: offlinePadChord.chordStr,
-                  semitones: offlinePadChord.semitones,
-                  time: seg.time,
-                  durationSec: seg.durationSec,
-                  beatDurationSec: seg.beatDurationSec,
-                  pattern: layer.pattern,
-                });
-              });
-            }
-            if (!anyPlayed) {
-              for (const e of offlinePadChains.values()) e.chain.poly.releaseAll(seg.time);
-            }
-          }
-
-          // 3. Multi-layer Arpeggiator
-          if (renderArp) {
-            if (lastOfflineArpSectionId !== null && lastOfflineArpSectionId !== seg.sectionId) {
-              for (const e of offlineArpChains.values()) e.chain.poly.releaseAll(seg.time);
-              offlineArpCursors.clear();
-            }
-            lastOfflineArpSectionId = seg.sectionId;
-
-            const offlineArpChord = resolveOfflineBusChord(synthSettings.arp.fillEmptyBars);
-            const arpLayers = getNormalizedArpLayers(seg.sectionArp);
-            let anyPlayed = false;
-
-            if (offlineArpChord && arpLayers.length > 0) {
-              arpLayers.forEach((layer, idx) => {
-                const cursorKey = layer.id || `arp-${idx}`;
-                if (!isBarInSectionLayerRange(layer, seg.sectionBarNumber, seg.sectionTotalBars)) {
-                  offlineArpCursors.set(cursorKey, 0);
-                  return;
-                }
-                anyPlayed = true;
-                const arpTone = layer.tone || DEFAULT_SECTION_ARP.tone;
-                const chain = getOfflineArpLayerChain(
-                  cursorKey,
-                  arpTone,
-                  layer.volumeDb ?? 0
-                );
-                const prevCursor = offlineArpCursors.get(cursorKey) ?? 0;
-                const nextCursor = scheduleSectionArpPattern(chain.poly, {
-                  chordStr: offlineArpChord.chordStr,
-                  semitones: offlineArpChord.semitones,
-                  time: seg.time,
-                  durationSec: seg.durationSec,
-                  beatDurationSec: seg.beatDurationSec,
-                  pattern: layer.pattern || DEFAULT_SECTION_ARP.pattern,
-                  tone: arpTone,
-                  subdivision: layer.subdivision || DEFAULT_SECTION_ARP.subdivision || '8n',
-                  stepOffset: prevCursor,
-                });
-                offlineArpCursors.set(cursorKey, nextCursor);
-              });
-            }
-            if (!anyPlayed) {
-              for (const e of offlineArpChains.values()) e.chain.poly.releaseAll(seg.time);
-            }
-          }
-
-          // 4. Multi-layer Drums & Rhythm (strictly checked by tracks.drums + section.drums.enabled)
-          if (renderDrums && seg.isBarStart && seg.sectionDrums?.enabled) {
-            const drumLayers = getNormalizedDrumLayers(seg.sectionDrums);
-            drumLayers.forEach((layer, idx) => {
-              const fillKey = `${seg.sectionId}::${layer.id || idx}`;
-              if (!isBarInSectionLayerRange(layer, seg.sectionBarNumber, seg.sectionTotalBars)) {
-                offlineDrumPrevWasFill.set(fillKey, false);
-                return;
+            if (allowLastBarVoice && ev.beatNum === 1) {
+              if (ev.step.bar.customCueId) {
+                scheduleRawVoiceBuffer(customBuffers.get(ev.step.bar.customCueId), ev.time);
+              } else if (ev.step.bar.cue) {
+                const url = resolveBundledCueUrl(ev.step.bar.cue);
+                if (url) scheduleRawVoiceBuffer(urlBuffers.get(url), ev.time);
               }
-              const isFillBar = shouldTriggerDrumFill(
-                layer,
-                seg.sectionBarNumber,
-                seg.sectionTotalBars
-              );
-              const prevWasFill = Boolean(offlineDrumPrevWasFill.get(fillKey));
-              const chain = getOfflineDrumLayerChain(
-                layer.id || `drum-${idx}`,
-                layer.kit,
-                layer.volumeDb ?? 0
-              );
-              scheduleSectionDrumPattern(chain, {
-                time: seg.time,
-                barDurationSec: seg.barDurationSec,
-                beatsPerBar: seg.beatsPerBar,
-                effectiveMeter: seg.effectiveMeter,
-                pattern: layer.pattern,
-                kit: layer.kit,
-                isFillBar,
-                fillStyle: layer.fillStyle || 'Tom Fill Cascade',
-                postFillCrash: prevWasFill && !isFillBar,
-              });
-              offlineDrumPrevWasFill.set(fillKey, isFillBar);
+            }
+
+            if (allowLastBarVoice && ev.step.bar.voiceCountLocked) {
+              const pattern = (ev.step.bar.countingSystem || '1 1 1 1')
+                .trim()
+                .split(/[\s,]+/)
+                .filter(Boolean);
+              const token =
+                pattern[(ev.beatNum - 1) % Math.max(1, pattern.length)] || String(ev.beatNum);
+              const parsed = parseInt(token, 10);
+              if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 7) {
+                scheduleRawVoiceBuffer(urlBuffers.get(resolveCountCueUrl(parsed)), ev.time);
+              }
+            }
+          }
+        }
+
+        // A2. Scheduled FX / Risers track (strictly filtered by tracks.fx)
+        if (renderFx && fxTriggers.length > 0) {
+          const offlineFxGain = rawCtx.createGain();
+          offlineFxGain.gain.setValueAtTime(Tone.dbToGain(fxBusCfg.volumeDb), 0);
+          const offlineFxPan = rawCtx.createStereoPanner();
+          offlineFxPan.pan.setValueAtTime(fxBusCfg.pan, 0);
+          offlineFxGain.connect(offlineFxPan);
+          offlineFxPan.connect(rawCtx.destination);
+
+          for (const fx of fxTriggers) {
+            scheduleWebAudioFx({
+              ctx: rawCtx,
+              destination: offlineFxGain,
+              effectType: fx.effectType,
+              startTime: fx.time,
+              durationSec: fx.durationSec,
+              beatDurationSec: fx.beatDurationSec,
+              volumeDb: fx.volumeDb,
             });
           }
         }
-      } else if (
-        !synthSettings.masterEnabled &&
-        metronomeSettings.chordAudioEnabled &&
-        metronomeSettings.chordVolume > 0 &&
-        (tracks.multiPad || tracks.synth || tracks.arp)
-      ) {
-        for (const seg of chordSegments) {
-          scheduleChordSynth(
-            rawCtx,
-            rawCtx.destination,
-            seg.time,
-            seg.chordStr,
-            seg.semitones,
-            seg.durationSec,
-            metronomeSettings.chordVolume
-          );
+
+        // B. Multi-Layer Per-Section Synth / Multi-Pad / Arpeggiator / Drums (strictly filtered by track selection)
+        const renderPad = tracks.multiPad && !synthSettings.pad.muted;
+        const renderSynth = tracks.synth && !synthSettings.synth.muted;
+        const renderArp = tracks.arp && !synthSettings.arp.muted;
+        const renderDrums = tracks.drums && synthSettings.drums.enabled && !synthSettings.drums.muted;
+
+        if (synthSettings.masterEnabled && (renderPad || renderSynth || renderArp || renderDrums)) {
+          const synthVol = new Tone.Volume(synthSettings.synth.volumeDb);
+          synthVol.mute = synthSettings.synth.muted;
+          const synthPan = new Tone.Panner(synthSettings.synth.pan);
+          synthVol.chain(synthPan, Tone.getDestination());
+
+          const offlineSynthChains = new Map<string, { chain: ToneVoiceChain; gain: Tone.Gain }>();
+          const getOfflineSynthLayerChain = (key: string, tone: SynthPresetId, volDb = 0) => {
+            const cacheKey = `${key}::${tone}`;
+            let entry = offlineSynthChains.get(cacheKey);
+            if (!entry) {
+              const chain = createSynthChainForPreset(tone);
+              const gain = new Tone.Gain(Tone.dbToGain(volDb));
+              chain.output.chain(gain, synthVol);
+              entry = { chain, gain };
+              offlineSynthChains.set(cacheKey, entry);
+            } else {
+              entry.gain.gain.setValueAtTime(Tone.dbToGain(volDb), 0);
+            }
+            return entry.chain;
+          };
+
+          const padFilter = new Tone.Filter(2600, 'lowpass');
+          const padVol = new Tone.Volume(synthSettings.pad.volumeDb);
+          padVol.mute = synthSettings.pad.muted;
+          const padPan = new Tone.Panner(synthSettings.pad.pan);
+          padFilter.chain(padVol, padPan, Tone.getDestination());
+
+          const offlinePadChains = new Map<string, { chain: ToneVoiceChain; gain: Tone.Gain }>();
+          const getOfflinePadLayerChain = (key: string, tone: PadPresetId, volDb = 0) => {
+            const cacheKey = `${key}::${tone}`;
+            let entry = offlinePadChains.get(cacheKey);
+            if (!entry) {
+              const chain = createPadChainForPreset(tone);
+              const gain = new Tone.Gain(Tone.dbToGain(volDb));
+              chain.output.chain(gain, padFilter);
+              entry = { chain, gain };
+              offlinePadChains.set(cacheKey, entry);
+            } else {
+              entry.gain.gain.setValueAtTime(Tone.dbToGain(volDb), 0);
+            }
+            return entry.chain;
+          };
+
+          const arpVol = new Tone.Volume(synthSettings.arp.volumeDb);
+          arpVol.mute = synthSettings.arp.muted;
+          const arpPan = new Tone.Panner(synthSettings.arp.pan);
+          arpVol.chain(arpPan, Tone.getDestination());
+
+          const offlineArpChains = new Map<string, { chain: ToneVoiceChain; gain: Tone.Gain }>();
+          const getOfflineArpLayerChain = (key: string, tone: ArpPresetId, volDb = 0) => {
+            const cacheKey = `${key}::${tone}`;
+            let entry = offlineArpChains.get(cacheKey);
+            if (!entry) {
+              const chain = createArpChainForPreset(tone);
+              const gain = new Tone.Gain(Tone.dbToGain(volDb));
+              chain.output.chain(gain, arpVol);
+              entry = { chain, gain };
+              offlineArpChains.set(cacheKey, entry);
+            } else {
+              entry.gain.gain.setValueAtTime(Tone.dbToGain(volDb), 0);
+            }
+            return entry.chain;
+          };
+
+          const drumsVol = new Tone.Volume(synthSettings.drums.volumeDb);
+          drumsVol.mute = !synthSettings.drums.enabled || synthSettings.drums.muted;
+          const drumsPan = new Tone.Panner(synthSettings.drums.pan);
+          drumsVol.chain(drumsPan, Tone.getDestination());
+
+          const offlineDrumChains = new Map<string, { chain: ToneDrumChain; gain: Tone.Gain }>();
+          const getOfflineDrumLayerChain = (key: string, kit: DrumKitId, volDb = 0) => {
+            const cacheKey = `${key}::${kit}`;
+            let entry = offlineDrumChains.get(cacheKey);
+            if (!entry) {
+              const chain = createDrumChainForKit(kit);
+              const gain = new Tone.Gain(Tone.dbToGain(volDb));
+              chain.output.chain(gain, drumsVol);
+              entry = { chain, gain };
+              offlineDrumChains.set(cacheKey, entry);
+            } else {
+              entry.gain.gain.setValueAtTime(Tone.dbToGain(volDb), 0);
+            }
+            return entry.chain;
+          };
+
+          let lastOfflinePadSectionId: string | null = null;
+          let lastOfflineSynthSectionId: string | null = null;
+          let lastOfflineArpSectionId: string | null = null;
+          const offlineArpCursors = new Map<string, number>();
+          const offlineDrumPrevWasFill = new Map<string, boolean>();
+          let offlineLastNonEmptyChord: { chordStr: string; semitones: number } | null = null;
+
+          for (const seg of chordSegments) {
+            const isEmptySeg = isEmptyChordToken(seg.chordStr);
+            if (!isEmptySeg) {
+              offlineLastNonEmptyChord = {
+                chordStr: seg.chordStr,
+                semitones: seg.semitones,
+              };
+            }
+
+            const resolveOfflineBusChord = (fillEmpty?: boolean) => {
+              if (!isEmptySeg) {
+                return { chordStr: seg.chordStr, semitones: seg.semitones };
+              }
+              if (fillEmpty && offlineLastNonEmptyChord) {
+                return offlineLastNonEmptyChord;
+              }
+              return null;
+            };
+
+            // 1. Multi-layer Synth
+            if (renderSynth) {
+              if (lastOfflineSynthSectionId !== null && lastOfflineSynthSectionId !== seg.sectionId) {
+                for (const e of offlineSynthChains.values()) e.chain.poly.releaseAll(seg.time);
+              }
+              lastOfflineSynthSectionId = seg.sectionId;
+
+              const offlineSynthChord = resolveOfflineBusChord(synthSettings.synth.fillEmptyBars);
+              const synthLayers = getNormalizedSynthLayers(seg.sectionSynth);
+              let anyPlayed = false;
+
+              if (offlineSynthChord && synthLayers.length > 0) {
+                synthLayers.forEach((layer, idx) => {
+                  if (!isBarInSectionLayerRange(layer, seg.sectionBarNumber, seg.sectionTotalBars)) {
+                    return;
+                  }
+                  anyPlayed = true;
+                  const chain = getOfflineSynthLayerChain(
+                    layer.id || `synth-${idx}`,
+                    layer.tone,
+                    layer.volumeDb ?? 0
+                  );
+                  scheduleSectionSynthPattern(chain.poly, {
+                    chordStr: offlineSynthChord.chordStr,
+                    semitones: offlineSynthChord.semitones,
+                    time: seg.time,
+                    durationSec: seg.durationSec,
+                    beatDurationSec: seg.beatDurationSec,
+                    pattern: layer.pattern,
+                    tone: layer.tone,
+                  });
+                });
+              }
+              if (!anyPlayed) {
+                for (const e of offlineSynthChains.values()) e.chain.poly.releaseAll(seg.time);
+              }
+            }
+
+            // 2. Multi-layer Multi-Pad
+            if (renderPad) {
+              if (lastOfflinePadSectionId !== null && lastOfflinePadSectionId !== seg.sectionId) {
+                for (const e of offlinePadChains.values()) e.chain.poly.releaseAll(seg.time);
+              }
+              lastOfflinePadSectionId = seg.sectionId;
+
+              const offlinePadChord = resolveOfflineBusChord(synthSettings.pad.fillEmptyBars);
+              const padLayers = getNormalizedPadLayers(seg.sectionMultiPad);
+              let anyPlayed = false;
+
+              if (offlinePadChord && padLayers.length > 0) {
+                padLayers.forEach((layer, idx) => {
+                  if (!isBarInSectionLayerRange(layer, seg.sectionBarNumber, seg.sectionTotalBars)) {
+                    return;
+                  }
+                  anyPlayed = true;
+                  const chain = getOfflinePadLayerChain(
+                    layer.id || `pad-${idx}`,
+                    layer.tone,
+                    layer.volumeDb ?? 0
+                  );
+                  scheduleSectionPadPattern(chain.poly, {
+                    chordStr: offlinePadChord.chordStr,
+                    semitones: offlinePadChord.semitones,
+                    time: seg.time,
+                    durationSec: seg.durationSec,
+                    beatDurationSec: seg.beatDurationSec,
+                    pattern: layer.pattern,
+                  });
+                });
+              }
+              if (!anyPlayed) {
+                for (const e of offlinePadChains.values()) e.chain.poly.releaseAll(seg.time);
+              }
+            }
+
+            // 3. Multi-layer Arpeggiator
+            if (renderArp) {
+              if (lastOfflineArpSectionId !== null && lastOfflineArpSectionId !== seg.sectionId) {
+                for (const e of offlineArpChains.values()) e.chain.poly.releaseAll(seg.time);
+                offlineArpCursors.clear();
+              }
+              lastOfflineArpSectionId = seg.sectionId;
+
+              const offlineArpChord = resolveOfflineBusChord(synthSettings.arp.fillEmptyBars);
+              const arpLayers = getNormalizedArpLayers(seg.sectionArp);
+              let anyPlayed = false;
+
+              if (offlineArpChord && arpLayers.length > 0) {
+                arpLayers.forEach((layer, idx) => {
+                  const cursorKey = layer.id || `arp-${idx}`;
+                  if (!isBarInSectionLayerRange(layer, seg.sectionBarNumber, seg.sectionTotalBars)) {
+                    offlineArpCursors.set(cursorKey, 0);
+                    return;
+                  }
+                  anyPlayed = true;
+                  const arpTone = layer.tone || DEFAULT_SECTION_ARP.tone;
+                  const chain = getOfflineArpLayerChain(
+                    cursorKey,
+                    arpTone,
+                    layer.volumeDb ?? 0
+                  );
+                  const prevCursor = offlineArpCursors.get(cursorKey) ?? 0;
+                  const nextCursor = scheduleSectionArpPattern(chain.poly, {
+                    chordStr: offlineArpChord.chordStr,
+                    semitones: offlineArpChord.semitones,
+                    time: seg.time,
+                    durationSec: seg.durationSec,
+                    beatDurationSec: seg.beatDurationSec,
+                    pattern: layer.pattern || DEFAULT_SECTION_ARP.pattern,
+                    tone: arpTone,
+                    subdivision: layer.subdivision || DEFAULT_SECTION_ARP.subdivision || '8n',
+                    stepOffset: prevCursor,
+                  });
+                  offlineArpCursors.set(cursorKey, nextCursor);
+                });
+              }
+              if (!anyPlayed) {
+                for (const e of offlineArpChains.values()) e.chain.poly.releaseAll(seg.time);
+              }
+            }
+
+            // 4. Multi-layer Drums & Rhythm (strictly checked by tracks.drums + section.drums.enabled)
+            if (renderDrums && seg.isBarStart && seg.sectionDrums?.enabled) {
+              const drumLayers = getNormalizedDrumLayers(seg.sectionDrums);
+              drumLayers.forEach((layer, idx) => {
+                const fillKey = `${seg.sectionId}::${layer.id || idx}`;
+                if (!isBarInSectionLayerRange(layer, seg.sectionBarNumber, seg.sectionTotalBars)) {
+                  offlineDrumPrevWasFill.set(fillKey, false);
+                  return;
+                }
+                const isFillBar = shouldTriggerDrumFill(
+                  layer,
+                  seg.sectionBarNumber,
+                  seg.sectionTotalBars
+                );
+                const prevWasFill = Boolean(offlineDrumPrevWasFill.get(fillKey));
+                const chain = getOfflineDrumLayerChain(
+                  layer.id || `drum-${idx}`,
+                  layer.kit,
+                  layer.volumeDb ?? 0
+                );
+                scheduleSectionDrumPattern(chain, {
+                  time: seg.time,
+                  barDurationSec: seg.barDurationSec,
+                  beatsPerBar: seg.beatsPerBar,
+                  effectiveMeter: seg.effectiveMeter,
+                  pattern: layer.pattern,
+                  kit: layer.kit,
+                  isFillBar,
+                  fillStyle: layer.fillStyle || 'Tom Fill Cascade',
+                  postFillCrash: prevWasFill && !isFillBar,
+                });
+                offlineDrumPrevWasFill.set(fillKey, isFillBar);
+              });
+            }
+          }
+        } else if (
+          !synthSettings.masterEnabled &&
+          metronomeSettings.chordAudioEnabled &&
+          metronomeSettings.chordVolume > 0 &&
+          (tracks.multiPad || tracks.synth || tracks.arp)
+        ) {
+          for (const seg of chordSegments) {
+            scheduleChordSynth(
+              rawCtx,
+              rawCtx.destination,
+              seg.time,
+              seg.chordStr,
+              seg.semitones,
+              seg.durationSec,
+              metronomeSettings.chordVolume
+            );
+          }
         }
-      }
-    },
-    totalRenderDuration,
-    2,
-    sampleRate
-  );
+      },
+      totalRenderDuration,
+      2,
+      sampleRate
+    );
 
-  onProgress?.(85, 'Encoding 16-bit PCM Stereo WAV...');
+    const nativeAudioBuffer = renderedToneBuffer.get();
+    if (!nativeAudioBuffer) {
+      throw new Error('Failed to obtain rendered AudioBuffer from Tone.Offline.');
+    }
 
-  const nativeAudioBuffer = renderedToneBuffer.get();
-  if (!nativeAudioBuffer) {
-    throw new Error('Failed to obtain rendered AudioBuffer from Tone.Offline.');
-  }
+    const filename = buildExportAudioFilename(
+      song.title,
+      song.key,
+      song.transpose || 0,
+      format
+    );
 
-  const filename = buildExportAudioFilename(
-    song.title,
-    song.key,
-    song.transpose || 0,
-    format
-  );
+    if (format === 'mp3') {
+      onProgress?.(78, 'Encoding Stereo MP3 in background worker...');
+      const mp3Blob = await encodeAudioBufferInBackgroundWorker(nativeAudioBuffer, 'mp3', (pct) => {
+        onProgress?.(pct, 'Encoding Stereo MP3 in background worker...');
+      });
+      onProgress?.(100, 'Stereo MP3 ready!');
+      return { blob: mp3Blob, filename, audioBuffer: nativeAudioBuffer };
+    }
 
-  if (format === 'mp3') {
-    onProgress?.(78, 'Encoding Stereo MP3...');
-    const mp3Blob = await encodeAudioBufferToMp3Blob(nativeAudioBuffer, (pct) => {
-      onProgress?.(pct, 'Encoding Stereo MP3...');
+    onProgress?.(85, 'Encoding 16-bit PCM Stereo WAV in background worker...');
+    const wavBlob = await encodeAudioBufferInBackgroundWorker(nativeAudioBuffer, 'wav', (pct) => {
+      onProgress?.(pct, 'Encoding 16-bit PCM Stereo WAV in background worker...');
     });
-    onProgress?.(100, 'Stereo MP3 ready!');
-    return { blob: mp3Blob, filename, audioBuffer: nativeAudioBuffer };
+    onProgress?.(100, 'Stereo WAV ready!');
+
+    return { blob: wavBlob, filename, audioBuffer: nativeAudioBuffer };
+  } finally {
+    releaseExportWakeLock();
   }
-
-  onProgress?.(85, 'Encoding 16-bit PCM Stereo WAV...');
-  const wavBlob = encodeAudioBufferToWavBlob(nativeAudioBuffer);
-  onProgress?.(100, 'Stereo WAV ready!');
-
-  return { blob: wavBlob, filename, audioBuffer: nativeAudioBuffer };
 }
 
 export async function exportFullProjectMixWav(options: {

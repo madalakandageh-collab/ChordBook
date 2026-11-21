@@ -27,6 +27,7 @@ import {
 } from '../utils/offlineOcr';
 import { formatBarChordsSummary } from '../utils/chords';
 import { ChordDisplay } from './ChordDisplay';
+import { acquireWakeLock } from '../hooks/useWakeLock';
 
 interface ScanChordSheetModalProps {
   onSaveSong: (song: Song) => void;
@@ -284,6 +285,7 @@ export const ScanChordSheetModal: React.FC<ScanChordSheetModalProps> = ({
     setOcrProgress({ status: 'Preparing cropped image…', progress: 5 });
     setStep('scanning');
 
+    const releaseWakeLock = await acquireWakeLock();
     try {
       const croppedCanvas = await prepareCroppedOcrCanvas({
         imageSrc: rawImageUrl,
@@ -321,6 +323,8 @@ export const ScanChordSheetModal: React.FC<ScanChordSheetModalProps> = ({
           : 'Offline OCR failed to read this image. Try cropping tighter around the chords.'
       );
       setStep('crop');
+    } finally {
+      releaseWakeLock();
     }
   };
 

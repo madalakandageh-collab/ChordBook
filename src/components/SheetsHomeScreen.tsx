@@ -10,6 +10,7 @@ import {
   FileAudio,
   FileJson,
   ListMusic,
+  Lock,
   Play,
   Plus,
   Search,
@@ -24,6 +25,7 @@ import {
   getSongTotalBars,
   transposeKey,
 } from '../utils/chords';
+import { FREE_SONG_LIMIT } from '../utils/capacitorBridge';
 import { ScanChordSheetModal } from './ScanChordSheetModal';
 
 export interface ImportedJsonPayload {
@@ -46,6 +48,8 @@ interface SheetsHomeScreenProps {
   songs: Song[];
   setlists: Setlist[];
   isLocked: boolean;
+  isPro: boolean;
+  hasPlayBar: boolean;
   onSelectSong: (songId: string) => void;
   onCreateSong: (song: Song) => void;
   onCreateSetlist: (name: string) => void;
@@ -57,12 +61,15 @@ interface SheetsHomeScreenProps {
   onExportLightweightJson: () => boolean;
   onExportFullBackupJson: () => boolean | Promise<boolean>;
   onExportSetlistJson: (setlistId: string) => boolean;
+  onRequirePro: (reason: string) => void;
 }
 
 export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
   songs,
   setlists,
   isLocked,
+  isPro,
+  hasPlayBar,
   onSelectSong,
   onCreateSong,
   onCreateSetlist,
@@ -74,6 +81,7 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
   onExportLightweightJson,
   onExportFullBackupJson,
   onExportSetlistJson,
+  onRequirePro,
 }) => {
   const [activeTab, setActiveTab] = useState<'songs' | 'setlists'>('songs');
   const [searchQuery, setSearchQuery] = useState('');
@@ -266,8 +274,16 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
     setShowNewSetlistModal(false);
   };
 
+  const floatingBottomClass = hasPlayBar
+    ? isPro
+      ? 'bottom-24'
+      : 'bottom-36'
+    : isPro
+    ? 'bottom-8'
+    : 'bottom-20';
+
   return (
-    <div className="max-w-4xl mx-auto px-4 pt-6 pb-36">
+    <div className="max-w-4xl mx-auto px-4 pt-6 pb-48">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -428,11 +444,31 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={() => setShowScanModal(true)}
+                onClick={() => {
+                  if (!isPro) {
+                    onRequirePro(
+                      'Scan Chord Sheet is a Chordbook Pro feature. Upgrade to scan handwritten charts offline.'
+                    );
+                    return;
+                  }
+                  if (songs.length >= FREE_SONG_LIMIT && !isPro) {
+                    onRequirePro(
+                      `You have reached the ${FREE_SONG_LIMIT}-song limit. Upgrade to Pro for unlimited songs.`
+                    );
+                    return;
+                  }
+                  setShowScanModal(true);
+                }}
                 className="min-h-[44px] px-4 py-2 rounded-xl bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[#E5A958]/50 text-xs sm:text-sm font-semibold text-[var(--accent-amber-text)] inline-flex items-center gap-2 transition shadow-xs"
               >
                 <Camera className="w-4 h-4" />
                 <span>Scan Chord Sheet</span>
+                {!isPro && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--accent-amber-tint-strong)] border border-[#E5A958]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--accent-amber-text)]">
+                    <Lock className="w-2.5 h-2.5" />
+                    PRO
+                  </span>
+                )}
               </button>
               <span className="text-xs text-[var(--text-muted)] hidden sm:inline">
                 Offline camera &amp; gallery chord OCR
@@ -470,8 +506,19 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
           })}
 
           {filteredSongs.length === 0 && (
-            <div className="md:col-span-2 py-12 text-center rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
-              <p className="text-[var(--text-muted)] text-sm">No songs match &ldquo;{searchQuery}&rdquo;.</p>
+            <div className="md:col-span-2 py-12 px-4 text-center rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+              {songs.length === 0 ? (
+                <div className="space-y-2">
+                  <p className="text-[var(--text-primary)] font-medium text-sm">
+                    Your chord book is empty
+                  </p>
+                  <p className="text-[var(--text-muted)] text-xs">
+                    Tap &ldquo;+ New song&rdquo; below or import a JSON sheet to get started.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-[var(--text-muted)] text-sm">No songs match &ldquo;{searchQuery}&rdquo;.</p>
+              )}
             </div>
           )}
           </div>
@@ -627,12 +674,22 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
 
       {/* Bottom Floating Action Pill */}
       {!isLocked && (
-        <div className="fixed bottom-20 left-0 right-0 z-30 flex justify-center pointer-events-none px-4">
+        <div className={`fixed ${floatingBottomClass} left-0 right-0 z-30 flex justify-center pointer-events-none px-4 transition-all`}>
           <button
             type="button"
-            onClick={() =>
-              activeTab === 'songs' ? setShowNewSongModal(true) : setShowNewSetlistModal(true)
-            }
+            onClick={() => {
+              if (activeTab === 'songs') {
+                if (!isPro && songs.length >= FREE_SONG_LIMIT) {
+                  onRequirePro(
+                    `You have reached the ${FREE_SONG_LIMIT}-song limit on the Free plan. Upgrade to Pro to add unlimited songs.`
+                  );
+                  return;
+                }
+                setShowNewSongModal(true);
+              } else {
+                setShowNewSetlistModal(true);
+              }
+            }}
             className="pointer-events-auto inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-[#E5A958] hover:bg-[#ecb66c] active:scale-95 text-[#121212] font-semibold text-[15px] shadow-xl shadow-black/25 transition"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />

@@ -12,6 +12,7 @@ interface PersistentPlayBarProps {
   totalBars: number;
   currentBeat: number;
   chordAudioEnabled: boolean;
+  hasAdBanner?: boolean;
   onTogglePlay: () => void;
   onToggleChordAudio: () => void;
   onOpenMixer: () => void;
@@ -27,6 +28,7 @@ export const PersistentPlayBar: React.FC<PersistentPlayBarProps> = ({
   totalBars,
   currentBeat,
   chordAudioEnabled,
+  hasAdBanner = false,
   onTogglePlay,
   onToggleChordAudio,
   onOpenMixer,
@@ -42,7 +44,9 @@ export const PersistentPlayBar: React.FC<PersistentPlayBarProps> = ({
   return (
     <div
       style={{ backgroundColor: 'var(--bg-playbar)' }}
-      className="fixed bottom-0 left-0 right-0 z-40 backdrop-blur-md border-t border-[var(--border-subtle)] px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-lg"
+      className={`fixed left-0 right-0 z-40 backdrop-blur-md border-t border-[var(--border-subtle)] px-4 py-2.5 shadow-lg ${
+        hasAdBanner ? 'bottom-[56px]' : 'bottom-0 pb-[max(0.625rem,env(safe-area-inset-bottom))]'
+      }`}
     >
       <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
         <div className="flex items-center gap-3.5 min-w-0">

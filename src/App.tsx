@@ -15,6 +15,8 @@ import { NavDrawer } from './components/NavDrawer';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PersistentPlayBar } from './components/PersistentPlayBar';
 import { PracticePlayerScreen, PracticeSelectScreen } from './components/PracticeScreens';
+import { ProUpgradeModal } from './components/ProUpgradeModal';
+import { AdBannerSlot } from './components/AdBannerSlot';
 import {
   DEFAULT_SECTION_ARP,
   DEFAULT_SECTION_DRUMS,
@@ -37,6 +39,13 @@ import { INITIAL_SETLISTS, INITIAL_SONGS } from './data/initialSongs';
 import { useMediaSession } from './hooks/useMediaSession';
 import { useRoomSync } from './hooks/useRoomSync';
 import { useWakeLock } from './hooks/useWakeLock';
+import {
+  FREE_SONG_LIMIT,
+  initializeAdMob,
+  initializeBillingStore,
+  loadIsProFromStorage,
+  saveIsProToStorage,
+} from './utils/capacitorBridge';
 import type {
   Bar,
   FxTypeId,
@@ -133,8 +142,24 @@ export default function App() {
     (urlRoom || loadFromStorage<string>(STORAGE_KEYS.roomId, '4829')).toUpperCase()
   );
   const [activeSongId, setActiveSongId] = useState<string>(() =>
-    loadFromStorage<string>(STORAGE_KEYS.activeSongId, INITIAL_SONGS[0].id)
+    loadFromStorage<string>(STORAGE_KEYS.activeSongId, INITIAL_SONGS[0]?.id ?? '')
   );
+  const [isPro, setIsPro] = useState<boolean>(() => loadIsProFromStorage());
+  const [showProModal, setShowProModal] = useState(false);
+  const [proModalReason, setProModalReason] = useState<string | null>(null);
+
+  const openProUpgradeModal = useCallback((reason?: string) => {
+    setProModalReason(reason || null);
+    setShowProModal(true);
+  }, []);
+
+  useEffect(() => {
+    void initializeAdMob();
+    void initializeBillingStore(() => {
+      setIsPro(true);
+      saveIsProToStorage(true);
+    });
+  }, []);
 
   const [screen, setScreen] = useState<ScreenName>(
     isDedicatedMemberUrl ? 'member' : 'sheets'
@@ -174,13 +199,13 @@ export default function App() {
   // Member synced state (used when role === 'member' or Preview Member App)
   const [remoteMemberState, setRemoteMemberState] = useState<RoomSyncState | null>(null);
 
-  const activeSong = useMemo(
-    () => songs.find((s) => s.id === activeSongId) || songs[0] || INITIAL_SONGS[0],
+  const activeSong: Song | null = useMemo(
+    () => songs.find((s) => s.id === activeSongId) || songs[0] || null,
     [songs, activeSongId]
   );
 
   const timeline = useMemo(
-    () => buildSongTimeline(activeSong, sectionTransposes, loopSectionId),
+    () => (activeSong ? buildSongTimeline(activeSong, sectionTransposes, loopSectionId) : []),
     [activeSong, sectionTransposes, loopSectionId]
   );
 
@@ -374,7 +399,7 @@ export default function App() {
 
   const startPlaybackFromIndex = useCallback(
     (startIndex: number, skipCountIn = false) => {
-      if (!timeline.length) return;
+      if (!timeline.length || !activeSong) return;
       const safeStart = Math.max(0, Math.min(startIndex, timeline.length - 1));
       setActiveStepIndex(safeStart);
       setCurrentBeat(1);
@@ -391,7 +416,7 @@ export default function App() {
         skipCountIn,
       });
     },
-    [timeline, clockOffsetMs, speed, activeSong.transpose, screen, loopSectionId]
+    [timeline, clockOffsetMs, speed, activeSong, screen, loopSectionId]
   );
 
   const stopPlayback = useCallback(() => {
@@ -413,6 +438,25 @@ export default function App() {
     }
   }, [isPlaying, stopPlayback, startPlaybackFromIndex]);
 
+  const handleStepSongTrack = useCallback(
+    (direction: 1 | -1) => {
+      const list = songsRef.current;
+      if (!list.length) return;
+      const currentIdx = activeSong ? list.findIndex((s) => s.id === activeSong.id) : 0;
+      const safeCurrent = currentIdx >= 0 ? currentIdx : 0;
+      const nextIdx = (safeCurrent + direction + list.length) % list.length;
+      const target = list[nextIdx];
+      if (!target) return;
+      stopPlayback();
+      setActiveSongId(target.id);
+      setActiveStepIndex(0);
+      setLoopSectionId(null);
+      setSectionTransposes({});
+      setHasUnsavedChanges(false);
+    },
+    [activeSong, stopPlayback]
+  );
+
   // Keep Screen Wake Lock active while playing (manual hardware screen lock still keeps audio playing)
   useWakeLock(isPlaying && !isMemberRole);
 
@@ -423,18 +467,23 @@ export default function App() {
     onPlay: useCallback(() => {
       if (!isPlaying) startPlaybackFromIndex(0);
     }, [isPlaying, startPlaybackFromIndex]),
+    onPause: stopPlayback,
     onStop: stopPlayback,
+    onNextTrack: useCallback(() => handleStepSongTrack(1), [handleStepSongTrack]),
+    onPreviousTrack: useCallback(() => handleStepSongTrack(-1), [handleStepSongTrack]),
   });
 
   // Song Update Helper
   const updateActiveSong = useCallback(
     (updater: (song: Song) => Song) => {
+      if (!activeSong) return;
+      const targetId = activeSong.id;
       setSongs((prev) =>
-        prev.map((s) => (s.id === activeSong.id ? { ...updater(s), updatedAt: Date.now() } : s))
+        prev.map((s) => (s.id === targetId ? { ...updater(s), updatedAt: Date.now() } : s))
       );
       setHasUnsavedChanges(true);
     },
-    [activeSong.id]
+    [activeSong]
   );
 
   const handleSelectSong = useCallback(
@@ -687,7 +736,7 @@ export default function App() {
       remoteMemberState || {
         roomId,
         song: activeSong,
-        transpose: activeSong.transpose || 0,
+        transpose: activeSong?.transpose || 0,
         sectionTransposes,
         isPlaying,
         activeBarIndex: activeStepIndex,
@@ -714,14 +763,15 @@ export default function App() {
   }
 
   // Locate editing bar for BarEditorModal
-  const editingSection = editingBarTarget
-    ? activeSong.sections.find((s) => s.id === editingBarTarget.sectionId)
-    : null;
+  const editingSection =
+    activeSong && editingBarTarget
+      ? activeSong.sections.find((s) => s.id === editingBarTarget.sectionId)
+      : null;
   const editingBar = editingSection
     ? editingSection.bars.find((b) => b.id === editingBarTarget?.barId)
     : null;
   const editingBarNumber =
-    editingBarTarget && editingBar
+    activeSong && editingBarTarget && editingBar
       ? getGlobalDisplayBarNumber(activeSong, editingBarTarget.sectionId, editingBarTarget.barId)
       : 1;
 
@@ -747,10 +797,21 @@ export default function App() {
         isOpen={isDrawerOpen}
         activeScreen={screen}
         memberCount={presence.memberCount}
+        isPro={isPro}
         onClose={() => setIsDrawerOpen(false)}
         onNavigate={(nextScreen) => {
+          if (!isPro && (nextScreen === 'live-mode' || nextScreen === 'local-wifi')) {
+            openProUpgradeModal(
+              nextScreen === 'live-mode'
+                ? 'Live Mode is a Chordbook Pro feature.'
+                : 'Local Wi-Fi band sync is a Chordbook Pro feature.'
+            );
+            return;
+          }
           setScreen(nextScreen);
         }}
+        onRequirePro={openProUpgradeModal}
+        onOpenProModal={() => openProUpgradeModal()}
       />
 
       {screen === 'sheets' && (
@@ -758,8 +819,16 @@ export default function App() {
           songs={songs}
           setlists={setlists}
           isLocked={isLocked}
+          isPro={isPro}
+          hasPlayBar={Boolean(activeSong)}
           onSelectSong={(id) => handleSelectSong(id, 'song-detail')}
           onCreateSong={(song) => {
+            if (!isPro && songsRef.current.length >= FREE_SONG_LIMIT) {
+              openProUpgradeModal(
+                `You have reached the ${FREE_SONG_LIMIT}-song limit on the Free plan. Upgrade to Pro to add unlimited songs.`
+              );
+              return;
+            }
             setSongs((prev) => [song, ...prev]);
             setActiveSongId(song.id);
             setScreen('song-detail');
@@ -803,6 +872,7 @@ export default function App() {
           onExportLightweightJson={handleExportLightweightJson}
           onExportFullBackupJson={handleExportFullBackupJson}
           onExportSetlistJson={handleExportSetlistJson}
+          onRequirePro={openProUpgradeModal}
         />
       )}
 
@@ -984,6 +1054,8 @@ export default function App() {
           onOpenSectionLayer={(sectionId, layer) =>
             setSectionLayerModal({ sectionId, layer })
           }
+          isPro={isPro}
+          onRequirePro={openProUpgradeModal}
         />
       )}
 
@@ -1054,7 +1126,7 @@ export default function App() {
         />
       )}
 
-      {screen === 'live-mode' && activeSong && (
+      {screen === 'live-mode' && isPro && activeSong && (
         <LiveModeScreen
           songs={songs}
           activeSong={activeSong}
@@ -1090,14 +1162,20 @@ export default function App() {
             if (isPlaying) startPlaybackFromIndex(idx, true);
             else setActiveStepIndex(idx);
           }}
-          onOpenLocalWifi={() => setScreen('local-wifi')}
+          onOpenLocalWifi={() => {
+            if (!isPro) {
+              openProUpgradeModal('Local Wi-Fi band sync is a Chordbook Pro feature.');
+              return;
+            }
+            setScreen('local-wifi');
+          }}
           onOpenSectionLayer={(sectionId, layer) =>
             setSectionLayerModal({ sectionId, layer })
           }
         />
       )}
 
-      {screen === 'local-wifi' && (
+      {screen === 'local-wifi' && isPro && (
         <LocalWifiScreen
           roomId={roomId}
           presence={presence}
@@ -1121,6 +1199,7 @@ export default function App() {
           totalBars={timeline.length || 1}
           currentBeat={currentBeat}
           chordAudioEnabled={settings.chordAudioEnabled}
+          hasAdBanner={!isPro}
           onTogglePlay={handleTogglePlay}
           onToggleChordAudio={() =>
             setSettings((prev) => ({
@@ -1132,8 +1211,37 @@ export default function App() {
         />
       )}
 
+      {/* Reserved Bottom Banner Ad Slot (hidden when Pro is active) */}
+      <AdBannerSlot
+        isPro={isPro}
+        onUpgradeClick={() =>
+          openProUpgradeModal('Upgrade to Chordbook Pro to remove all ads and unlock every feature.')
+        }
+      />
+
+      {/* Upgrade to Pro Modal */}
+      {showProModal && (
+        <ProUpgradeModal
+          isPro={isPro}
+          reasonText={proModalReason}
+          onUnlocked={() => {
+            setIsPro(true);
+            saveIsProToStorage(true);
+            setShowProModal(false);
+          }}
+          onToggleTestPro={() => {
+            setIsPro((prev) => {
+              const next = !prev;
+              saveIsProToStorage(next);
+              return next;
+            });
+          }}
+          onClose={() => setShowProModal(false)}
+        />
+      )}
+
       {/* Bar Editor Modal */}
-      {editingBar && editingSection && editingBarTarget && (
+      {activeSong && editingBar && editingSection && editingBarTarget && (
         <BarEditorModal
           bar={editingBar}
           barNumber={editingBarNumber}

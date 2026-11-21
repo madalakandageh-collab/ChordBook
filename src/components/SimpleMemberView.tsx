@@ -23,7 +23,7 @@ interface SimpleMemberViewProps {
   roomId: string;
   syncStatus: SyncConnectionStatus;
   syncedState: RoomSyncState | null;
-  fallbackSong: Song;
+  fallbackSong: Song | null;
   clockOffsetMs: number;
   isPreview?: boolean;
   onExitPreview?: () => void;
@@ -58,7 +58,7 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
   const wakeLockActive = useWakeLock(true);
 
   const activeSong = syncedState?.song || fallbackSong;
-  const globalTranspose = syncedState?.transpose ?? activeSong.transpose ?? 0;
+  const globalTranspose = syncedState?.transpose ?? activeSong?.transpose ?? 0;
   const sectionTransposes = syncedState?.sectionTransposes ?? {};
   const isPlaying = syncedState?.isPlaying ?? false;
   const speed = syncedState?.speed ?? 100;
@@ -66,7 +66,7 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
   const loopSectionId = syncedState?.loopSectionId ?? null;
 
   const timeline = useMemo(
-    () => buildSongTimeline(activeSong, sectionTransposes, loopSectionId),
+    () => (activeSong ? buildSongTimeline(activeSong, sectionTransposes, loopSectionId) : []),
     [activeSong, sectionTransposes, loopSectionId]
   );
 
@@ -79,7 +79,7 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
     }
 
     const computeExactBar = () => {
-      if (!timeline.length) return;
+      if (!timeline.length || !activeSong) return;
       const estimatedServerNow = Date.now() + clockOffsetMs;
       const elapsedSec = Math.max(
         0,
@@ -116,7 +116,30 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
     computeExactBar();
     const interval = window.setInterval(computeExactBar, 80);
     return () => clearInterval(interval);
-  }, [syncedState, clockOffsetMs, timeline, tempoOverride, activeSong.bpm, speed, loopSectionId]);
+  }, [syncedState, clockOffsetMs, timeline, tempoOverride, activeSong, speed, loopSectionId]);
+
+  if (!activeSong) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] flex flex-col items-center justify-center px-6 text-center gap-4">
+        <p className="text-xs font-medium tracking-[0.26em] text-[var(--text-muted)] uppercase">
+          CHORDBOOK STAGE · ROOM {roomId}
+        </p>
+        <h1 className="font-serif-display text-2xl font-bold">Waiting for Band Leader</h1>
+        <p className="text-sm text-[var(--text-muted)] max-w-sm">
+          Add or open a song on the Band Leader device to display live synced chord charts here.
+        </p>
+        {isPreview && onExitPreview && (
+          <button
+            type="button"
+            onClick={onExitPreview}
+            className="px-4 py-2 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-sm font-medium"
+          >
+            Exit Preview
+          </button>
+        )}
+      </div>
+    );
+  }
 
   const currentStep = timeline[tickBarIndex] || timeline[0];
   const activeBarId = currentStep?.barId || null;

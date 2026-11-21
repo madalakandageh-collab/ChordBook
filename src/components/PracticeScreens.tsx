@@ -40,32 +40,43 @@ export const PracticeSelectScreen: React.FC<PracticeSelectScreenProps> = ({
       </div>
 
       <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3">
-        {songs.map((song) => {
-          const displayKey = transposeKey(song.key, song.transpose || 0);
-          return (
-            <button
-              key={song.id}
-              type="button"
-              onClick={() => onSelectSong(song.id)}
-              className="w-full flex items-center justify-between gap-3.5 p-4 rounded-2xl bg-[var(--bg-surface)] hover:bg-[var(--bg-hover)] active:scale-[0.99] border border-[var(--border-subtle)] text-left transition shadow-xs"
-            >
-              <div className="flex items-center gap-3.5 min-w-0">
-                <div className="w-11 h-11 rounded-full bg-[var(--accent-amber-tint-strong)] border border-[#E5A958]/30 text-[var(--accent-amber-text)] font-bold text-[15px] flex items-center justify-center shrink-0">
-                  {displayKey}
+        {songs.length === 0 ? (
+          <div className="md:col-span-2 py-12 px-4 text-center rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-2">
+            <p className="text-[var(--text-primary)] font-medium text-sm">
+              No songs available to practice yet
+            </p>
+            <p className="text-[var(--text-muted)] text-xs">
+              Add a song in &ldquo;Your sheets&rdquo; first to start rehearsing.
+            </p>
+          </div>
+        ) : (
+          songs.map((song) => {
+            const displayKey = transposeKey(song.key, song.transpose || 0);
+            return (
+              <button
+                key={song.id}
+                type="button"
+                onClick={() => onSelectSong(song.id)}
+                className="w-full flex items-center justify-between gap-3.5 p-4 rounded-2xl bg-[var(--bg-surface)] hover:bg-[var(--bg-hover)] active:scale-[0.99] border border-[var(--border-subtle)] text-left transition shadow-xs"
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-11 h-11 rounded-full bg-[var(--accent-amber-tint-strong)] border border-[#E5A958]/30 text-[var(--accent-amber-text)] font-bold text-[15px] flex items-center justify-center shrink-0">
+                    {displayKey}
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-[16px] font-medium text-[var(--text-primary)] truncate">
+                      {song.title}
+                    </h2>
+                    <p className="text-[13px] text-[var(--text-muted)] mt-0.5 tabular-nums">
+                      {song.bpm} bpm · {song.timeSignature}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <h2 className="text-[16px] font-medium text-[var(--text-primary)] truncate">
-                    {song.title}
-                  </h2>
-                  <p className="text-[13px] text-[var(--text-muted)] mt-0.5 tabular-nums">
-                    {song.bpm} bpm · {song.timeSignature}
-                  </p>
-                </div>
-              </div>
-              <Target className="w-5 h-5 text-[var(--accent-amber-text)] shrink-0" />
-            </button>
-          );
-        })}
+                <Target className="w-5 h-5 text-[var(--accent-amber-text)] shrink-0" />
+              </button>
+            );
+          })
+        )}
       </div>
     </div>
   );

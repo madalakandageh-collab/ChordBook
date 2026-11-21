@@ -10,6 +10,8 @@ import {
   FileText,
   FolderDown,
   ListOrdered,
+  Loader2,
+  Lock,
   MoreVertical,
   Play,
   Plus,
@@ -17,6 +19,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { showExportVideoAd } from '../utils/capacitorBridge';
 import type {
   Bar,
   LastBarCuePassRule,
@@ -95,6 +98,8 @@ interface ChordSheetScreenProps {
   onUpdateSynthSettings: (next: SynthBackingSettings) => void;
   onSeekToBarId: (sectionId: string, barId: string) => void;
   onOpenSectionLayer: (sectionId: string, layer: SectionLayerType) => void;
+  isPro: boolean;
+  onRequirePro: (reason: string) => void;
 }
 
 export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
@@ -130,6 +135,8 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
   onUpdateSynthSettings,
   onSeekToBarId,
   onOpenSectionLayer,
+  isPro,
+  onRequirePro,
 }) => {
   const [tab, setTab] = useState<'chords' | 'synth' | 'lyrics'>('chords');
   const [showSongMenu, setShowSongMenu] = useState(false);
@@ -147,6 +154,23 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
   const [showLyricsEditor, setShowLyricsEditor] = useState(false);
   const [lyricsDraftText, setLyricsDraftText] = useState('');
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const [isLoadingExportAd, setIsLoadingExportAd] = useState(false);
+
+  const handleExportAudioClick = async () => {
+    setShowSongMenu(false);
+    if (isPro) {
+      onOpenExportAudio();
+      return;
+    }
+    if (isLoadingExportAd) return;
+    setIsLoadingExportAd(true);
+    try {
+      await showExportVideoAd();
+      onOpenExportAudio();
+    } finally {
+      setIsLoadingExportAd(false);
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -252,27 +276,41 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
 
           <button
             type="button"
+            disabled={isLoadingExportAd}
             onClick={() => setShowSongMenu((v) => !v)}
             aria-label="Song options"
-            className="w-10 h-10 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center justify-center transition shadow-xs"
+            className="w-10 h-10 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center justify-center transition shadow-xs disabled:opacity-70"
           >
-            <MoreVertical className="w-4 h-4" />
+            {isLoadingExportAd ? (
+              <Loader2 className="w-4 h-4 animate-spin text-[var(--accent-amber-text)]" />
+            ) : (
+              <MoreVertical className="w-4 h-4" />
+            )}
           </button>
 
           {showSongMenu && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setShowSongMenu(false)} />
-              <div className="absolute right-0 top-14 z-40 w-60 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-2xl py-1.5 text-sm">
+              <div className="absolute right-0 top-14 z-40 w-72 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-2xl py-1.5 text-sm">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowSongMenu(false);
-                    onOpenExportAudio();
-                  }}
-                  className="w-full px-4 py-2.5 text-left hover:bg-[var(--bg-elevated)] text-[var(--accent-amber-text)] font-medium flex items-center gap-2"
+                  disabled={isLoadingExportAd}
+                  onClick={() => void handleExportAudioClick()}
+                  className="w-full px-4 py-2.5 text-left hover:bg-[var(--bg-elevated)] text-[var(--accent-amber-text)] font-medium flex items-center justify-between gap-2 disabled:opacity-60"
                 >
-                  <FileAudio className="w-4 h-4 shrink-0" />
-                  <span>Export Audio Track (WAV / MP3)</span>
+                  <span className="flex items-center gap-2 min-w-0">
+                    {isLoadingExportAd ? (
+                      <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+                    ) : (
+                      <FileAudio className="w-4 h-4 shrink-0" />
+                    )}
+                    <span className="truncate">Export Audio Track (WAV / MP3)</span>
+                  </span>
+                  {!isPro && (
+                    <span className="px-1.5 py-0.5 rounded bg-[var(--accent-amber-tint-strong)] border border-[#E5A958]/40 text-[10px] font-extrabold uppercase tracking-wider text-[var(--accent-amber-text)] shrink-0">
+                      Ad
+                    </span>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -505,26 +543,41 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
         </button>
         <button
           type="button"
-          onClick={() => setTab('synth')}
+          onClick={() => {
+            if (!isPro) {
+              onRequirePro('Synth & Backing is a Chordbook Pro feature. Upgrade to unlock backing instruments.');
+              return;
+            }
+            setTab('synth');
+          }}
           className={`py-2.5 px-2 rounded-full text-[11px] sm:text-[13px] font-bold tracking-[0.06em] sm:tracking-[0.1em] uppercase transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap truncate ${
-            tab === 'synth'
+            tab === 'synth' && isPro
               ? 'bg-[#E5A958] text-[#121212]'
               : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
         >
-          <span
-            aria-label={synthSettings.masterEnabled ? 'Synth active' : 'Synth off'}
-            className={`w-2.5 h-2.5 rounded-full shrink-0 transition-all ${
-              synthSettings.masterEnabled
-                ? tab === 'synth'
-                  ? 'bg-emerald-300 ring-1 ring-emerald-950/35 shadow-[0_0_10px_rgba(16,185,129,0.95)]'
-                  : 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.95)] ring-2 ring-emerald-400/30'
-                : tab === 'synth'
-                ? 'bg-[#121212]/35'
-                : 'bg-zinc-500/45'
-            }`}
-          />
+          {isPro ? (
+            <span
+              aria-label={synthSettings.masterEnabled ? 'Synth active' : 'Synth off'}
+              className={`w-2.5 h-2.5 rounded-full shrink-0 transition-all ${
+                synthSettings.masterEnabled
+                  ? tab === 'synth'
+                    ? 'bg-emerald-300 ring-1 ring-emerald-950/35 shadow-[0_0_10px_rgba(16,185,129,0.95)]'
+                    : 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.95)] ring-2 ring-emerald-400/30'
+                  : tab === 'synth'
+                  ? 'bg-[#121212]/35'
+                  : 'bg-zinc-500/45'
+              }`}
+            />
+          ) : (
+            <Lock className="w-3 h-3 text-[var(--accent-amber-text)] shrink-0" />
+          )}
           <span className="truncate">Synth &amp; Backing</span>
+          {!isPro && (
+            <span className="px-1 py-0.2 rounded bg-[var(--accent-amber-tint-strong)] border border-[#E5A958]/40 text-[9px] font-extrabold text-[var(--accent-amber-text)] shrink-0">
+              PRO
+            </span>
+          )}
         </button>
         <button
           type="button"

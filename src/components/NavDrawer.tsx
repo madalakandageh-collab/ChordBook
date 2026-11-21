@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, GraduationCap, Radio, Wifi, X } from 'lucide-react';
+import { BookOpen, GraduationCap, Lock, Radio, Wifi, X } from 'lucide-react';
 import type { ScreenName } from '../types';
 import { PWAInstallButton } from './PWAInstallButton';
 
@@ -7,16 +7,22 @@ interface NavDrawerProps {
   isOpen: boolean;
   activeScreen: ScreenName;
   memberCount: number;
+  isPro: boolean;
   onClose: () => void;
   onNavigate: (screen: ScreenName) => void;
+  onRequirePro: (reason: string) => void;
+  onOpenProModal: () => void;
 }
 
 export const NavDrawer: React.FC<NavDrawerProps> = ({
   isOpen,
   activeScreen,
   memberCount,
+  isPro,
   onClose,
   onNavigate,
+  onRequirePro,
+  onOpenProModal,
 }) => {
   if (!isOpen) return null;
 
@@ -25,6 +31,8 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
     label: string;
     icon: React.ReactNode;
     badge?: string;
+    proLocked?: boolean;
+    proReason?: string;
   }> = [
     {
       id: 'sheets',
@@ -35,7 +43,9 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
       id: 'live-mode',
       label: 'Live mode',
       icon: <Radio className="w-5 h-5 text-[var(--accent-amber-text)]" />,
-      badge: memberCount > 0 ? `${memberCount} synced` : undefined,
+      badge: isPro && memberCount > 0 ? `${memberCount} synced` : undefined,
+      proLocked: !isPro,
+      proReason: 'Live Mode is a Chordbook Pro feature. Upgrade to unlock live stage mode.',
     },
     {
       id: 'practice-select',
@@ -46,6 +56,8 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
       id: 'local-wifi',
       label: 'Local Wi-Fi',
       icon: <Wifi className="w-5 h-5 text-[var(--accent-amber-text)]" />,
+      proLocked: !isPro,
+      proReason: 'Local Wi-Fi band sync is a Chordbook Pro feature. Upgrade to sync band devices.',
     },
   ];
 
@@ -68,9 +80,25 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
         aria-label="Navigation Drawer"
       >
         <div className="flex items-center justify-between pb-6">
-          <span className="text-xs font-medium tracking-[0.28em] text-[var(--text-muted)] uppercase">
-            CHORDBOOK
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium tracking-[0.28em] text-[var(--text-muted)] uppercase">
+              CHORDBOOK
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenProModal();
+              }}
+              className={`px-2 py-0.5 rounded text-[9px] font-extrabold tracking-wider uppercase transition ${
+                isPro
+                  ? 'bg-[#E5A958] text-[#121212] hover:bg-[#ecb66c]'
+                  : 'bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--accent-amber-text)] hover:bg-[var(--bg-hover)]'
+              }`}
+            >
+              {isPro ? 'PRO' : 'FREE · UPGRADE'}
+            </button>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -89,8 +117,12 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
                 key={item.id}
                 type="button"
                 onClick={() => {
-                  onNavigate(item.id);
                   onClose();
+                  if (item.proLocked) {
+                    onRequirePro(item.proReason || 'Upgrade to Pro to unlock this feature.');
+                  } else {
+                    onNavigate(item.id);
+                  }
                 }}
                 className={`w-full flex items-center justify-between gap-3 px-3 py-3.5 rounded-xl text-left transition ${
                   active
@@ -98,14 +130,21 @@ export const NavDrawer: React.FC<NavDrawerProps> = ({
                     : 'text-[var(--text-primary)]/90 hover:bg-[var(--bg-elevated)]'
                 }`}
               >
-                <span className="flex items-center gap-4">
+                <span className="flex items-center gap-4 min-w-0">
                   <span className="shrink-0">{item.icon}</span>
-                  <span className="text-[16px] font-medium whitespace-nowrap">{item.label}</span>
+                  <span className="text-[16px] font-medium whitespace-nowrap truncate">{item.label}</span>
                 </span>
-                {item.badge && (
-                  <span className="text-[11px] font-medium text-[var(--accent-amber-text)] tabular-nums">
-                    {item.badge}
+                {item.proLocked ? (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--accent-amber-tint-strong)] border border-[#E5A958]/40 text-[10px] font-bold uppercase tracking-wider text-[var(--accent-amber-text)] shrink-0">
+                    <Lock className="w-2.5 h-2.5" />
+                    PRO
                   </span>
+                ) : (
+                  item.badge && (
+                    <span className="text-[11px] font-medium text-[var(--accent-amber-text)] tabular-nums shrink-0">
+                      {item.badge}
+                    </span>
+                  )
                 )}
               </button>
             );
