@@ -274,10 +274,12 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
     setShowNewSetlistModal(false);
   };
 
-  const floatingBottomClass = hasPlayBar ? 'bottom-24' : 'bottom-8';
+  const floatingBottomClass = hasPlayBar
+    ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))]'
+    : 'bottom-[calc(1.75rem+env(safe-area-inset-bottom,0px))]';
 
   return (
-    <div className="max-w-4xl mx-auto px-4 pt-6 pb-48">
+    <div className="max-w-4xl mx-auto px-4 pt-6 pb-24">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>

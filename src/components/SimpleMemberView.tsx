@@ -120,7 +120,7 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
 
   if (!activeSong) {
     return (
-      <div className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] flex flex-col items-center justify-center px-6 text-center gap-4">
+      <div className="h-full overflow-y-auto bg-[var(--bg-canvas)] text-[var(--text-primary)] flex flex-col items-center justify-center px-6 text-center gap-4">
         <p className="text-xs font-medium tracking-[0.26em] text-[var(--text-muted)] uppercase">
           CHORDBOOK STAGE · ROOM {roomId}
         </p>
@@ -168,11 +168,14 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
   let runningBarNum = 0;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] pb-16 transition-colors">
+    <div className="h-full flex flex-col overflow-hidden bg-[var(--bg-canvas)] text-[var(--text-primary)] transition-colors">
       {/* Minimal Read-Only Member Header */}
       <header
-        style={{ backgroundColor: 'var(--bg-header-sticky)' }}
-        className="sticky top-0 z-30 backdrop-blur-md border-b border-[var(--border-subtle)] px-3 sm:px-4 py-3"
+        style={{
+          backgroundColor: 'var(--bg-header-sticky)',
+          paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))',
+        }}
+        className="shrink-0 z-30 backdrop-blur-md border-b border-[var(--border-subtle)] px-3 sm:px-4 pb-3"
       >
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-2 sm:gap-3">
           {/* Left: LIVE SYNCED badge */}
@@ -222,7 +225,14 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
         </div>
       </header>
 
-      <div className="max-w-3xl mx-auto px-4 pt-4 space-y-4">
+      <div
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))',
+        }}
+        className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain"
+      >
+        <div className="max-w-3xl mx-auto px-4 pt-4 space-y-4">
         {/* Optional PWA Add to Home Screen prompt for Chordbook Stage */}
         <PWAInstallButton appName="Chordbook Stage" variant="banner" />
 
@@ -418,6 +428,7 @@ export const SimpleMemberView: React.FC<SimpleMemberViewProps> = ({
         <p className="text-center text-[11px] text-[var(--text-subtle)] pt-2">
           Chordbook Stage · Read-only live sync{wakeLockActive ? ' · Screen kept awake' : ''}
         </p>
+        </div>
       </div>
 
       {/* Exit Preview Pill (ONLY shown when Leader clicks "Preview Member App") */}

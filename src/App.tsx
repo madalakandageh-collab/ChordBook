@@ -782,7 +782,7 @@ export default function App() {
   const showTopBlueBar = screen !== 'practice-player';
 
   return (
-    <div className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] transition-colors">
+    <div className="flex flex-col h-full w-full overflow-hidden bg-[var(--bg-canvas)] text-[var(--text-primary)] transition-colors">
       {showTopBlueBar && (
         <TopBar
           onOpenMenu={() => setIsDrawerOpen(true)}
@@ -818,6 +818,12 @@ export default function App() {
         onOpenProModal={() => openProUpgradeModal()}
       />
 
+      <main
+        style={{ WebkitOverflowScrolling: 'touch' }}
+        className={`flex-1 min-h-0 overflow-y-auto overscroll-y-contain ${
+          !showTopBlueBar ? 'pt-[env(safe-area-inset-top,0px)]' : ''
+        }`}
+      >
       {screen === 'sheets' && (
         <SheetsHomeScreen
           songs={songs}
@@ -1193,6 +1199,7 @@ export default function App() {
           onBack={() => setScreen('sheets')}
         />
       )}
+      </main>
 
       {/* Persistent Always-Visible Play/Stop Bar across all Leader screens */}
       {activeSong && (

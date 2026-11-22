@@ -238,7 +238,7 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 pt-4 pb-32">
+    <div className="max-w-4xl mx-auto px-4 pt-4 pb-10">
       {/* Back Button */}
       <button
         type="button"
