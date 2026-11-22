@@ -9,11 +9,26 @@ import {
 interface AdBannerSlotProps {
   isPro: boolean;
   onUpgradeClick: () => void;
+  onBannerHeightChange?: (height: number) => void;
 }
 
-export const AdBannerSlot: React.FC<AdBannerSlotProps> = ({ isPro, onUpgradeClick }) => {
+export const AdBannerSlot: React.FC<AdBannerSlotProps> = ({
+  isPro,
+  onUpgradeClick,
+  onBannerHeightChange,
+}) => {
   const isNative = isNativeCapacitorAndroid();
   const [nativeBannerHeight, setNativeBannerHeight] = useState(56);
+
+  useEffect(() => {
+    if (isPro) {
+      onBannerHeightChange?.(0);
+      void removeAdMobBanner();
+      return;
+    }
+
+    onBannerHeightChange?.(nativeBannerHeight);
+  }, [isPro, nativeBannerHeight, onBannerHeightChange]);
 
   useEffect(() => {
     if (isPro) {
@@ -28,6 +43,14 @@ export const AdBannerSlot: React.FC<AdBannerSlotProps> = ({ isPro, onUpgradeClic
       void (async () => {
         try {
           const { AdMob, BannerAdPluginEvents } = await import('@capacitor-community/admob');
+          try {
+            const adaptive = await AdMob.getAdaptiveBannerSize();
+            if (!cancelled && adaptive.height > 0) {
+              setNativeBannerHeight(adaptive.height);
+            }
+          } catch {
+            // Adaptive size fallback remains 56px until SizeChanged fires
+          }
           const handle = await AdMob.addListener(
             BannerAdPluginEvents.SizeChanged,
             (size) => {
@@ -65,8 +88,12 @@ export const AdBannerSlot: React.FC<AdBannerSlotProps> = ({ isPro, onUpgradeClic
   return (
     <div
       aria-label="Advertisement banner space"
-      style={isNative ? { height: `${nativeBannerHeight}px` } : undefined}
-      className="fixed bottom-0 left-0 right-0 z-40 h-[56px] bg-[var(--bg-recessed)] border-t border-[var(--border-subtle)] flex items-center justify-between px-4"
+      style={{
+        height: isNative
+          ? `calc(${nativeBannerHeight}px + env(safe-area-inset-bottom, 0px))`
+          : 'calc(56px + env(safe-area-inset-bottom, 0px))',
+      }}
+      className="fixed bottom-0 left-0 right-0 z-40 pb-[env(safe-area-inset-bottom)] bg-[var(--bg-recessed)] border-t border-[var(--border-subtle)] flex items-center justify-between px-4"
     >
       {isNative ? (
         <span className="text-[11px] text-[var(--text-subtle)] mx-auto">AdMob Test Banner</span>

@@ -17,7 +17,10 @@ export const PracticeSelectScreen: React.FC<PracticeSelectScreenProps> = ({
   onSelectSong,
 }) => {
   return (
-    <div className="max-w-4xl mx-auto px-4 pt-4 pb-32">
+    <div
+      style={{ paddingBottom: 'calc(8rem + var(--ad-banner-offset, 0px))' }}
+      className="max-w-4xl mx-auto px-4 pt-4"
+    >
       <button
         type="button"
         onClick={onBack}
@@ -146,7 +149,10 @@ export const PracticePlayerScreen: React.FC<PracticePlayerScreenProps> = ({
   });
 
   return (
-    <div className="min-h-screen bg-[var(--bg-canvas)] pb-32 transition-colors">
+    <div
+      style={{ paddingBottom: 'calc(8rem + var(--ad-banner-offset, 0px))' }}
+      className="min-h-screen bg-[var(--bg-canvas)] transition-colors"
+    >
       {/* Custom Practice Header (no blue bar) */}
       <div className="max-w-2xl mx-auto px-4 pt-4 flex items-center justify-between">
         <button

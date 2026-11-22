@@ -69,7 +69,10 @@ export const LiveModeScreen: React.FC<LiveModeScreenProps> = ({
   });
 
   return (
-    <div className="max-w-4xl mx-auto px-4 pt-4 pb-32 space-y-4">
+    <div
+      style={{ paddingBottom: 'calc(8rem + var(--ad-banner-offset, 0px))' }}
+      className="max-w-4xl mx-auto px-4 pt-4 space-y-4"
+    >
       {/* Header Row */}
       <div className="flex items-center justify-between gap-3">
         <button

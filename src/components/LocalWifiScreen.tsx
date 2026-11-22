@@ -106,7 +106,10 @@ export const LocalWifiScreen: React.FC<LocalWifiScreenProps> = ({
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 pt-4 pb-32 space-y-5">
+    <div
+      style={{ paddingBottom: 'calc(8rem + var(--ad-banner-offset, 0px))' }}
+      className="max-w-3xl mx-auto px-4 pt-4 space-y-5"
+    >
       <div className="flex items-center justify-between">
         <button
           type="button"

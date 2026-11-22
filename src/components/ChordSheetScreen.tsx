@@ -238,7 +238,10 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 pt-4 pb-32">
+    <div
+      style={{ paddingBottom: 'calc(8rem + var(--ad-banner-offset, 0px))' }}
+      className="max-w-4xl mx-auto px-4 pt-4"
+    >
       {/* Back Button */}
       <button
         type="button"

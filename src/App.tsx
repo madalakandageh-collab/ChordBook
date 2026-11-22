@@ -145,8 +145,19 @@ export default function App() {
     loadFromStorage<string>(STORAGE_KEYS.activeSongId, INITIAL_SONGS[0]?.id ?? '')
   );
   const [isPro, setIsPro] = useState<boolean>(() => loadIsProFromStorage());
+  const [adBannerHeight, setAdBannerHeight] = useState(56);
   const [showProModal, setShowProModal] = useState(false);
   const [proModalReason, setProModalReason] = useState<string | null>(null);
+
+  useEffect(() => {
+    const offset = isPro
+      ? '0px'
+      : `calc(${adBannerHeight > 0 ? adBannerHeight : 56}px + env(safe-area-inset-bottom, 0px) + 12px)`;
+    document.documentElement.style.setProperty('--ad-banner-offset', offset);
+    return () => {
+      document.documentElement.style.removeProperty('--ad-banner-offset');
+    };
+  }, [isPro, adBannerHeight]);
 
   const openProUpgradeModal = useCallback((reason?: string) => {
     setProModalReason(reason || null);
@@ -1200,6 +1211,7 @@ export default function App() {
           currentBeat={currentBeat}
           chordAudioEnabled={settings.chordAudioEnabled}
           hasAdBanner={!isPro}
+          adBannerHeight={isPro ? 0 : adBannerHeight > 0 ? adBannerHeight : 56}
           onTogglePlay={handleTogglePlay}
           onToggleChordAudio={() =>
             setSettings((prev) => ({
@@ -1214,6 +1226,7 @@ export default function App() {
       {/* Reserved Bottom Banner Ad Slot (hidden when Pro is active) */}
       <AdBannerSlot
         isPro={isPro}
+        onBannerHeightChange={(h) => setAdBannerHeight(h)}
         onUpgradeClick={() =>
           openProUpgradeModal('Upgrade to Chordbook Pro to remove all ads and unlock every feature.')
         }

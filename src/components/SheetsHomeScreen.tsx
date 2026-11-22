@@ -274,16 +274,17 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
     setShowNewSetlistModal(false);
   };
 
-  const floatingBottomClass = hasPlayBar
-    ? isPro
-      ? 'bottom-24'
-      : 'bottom-36'
-    : isPro
-    ? 'bottom-8'
-    : 'bottom-20';
+  const floatingBottomStyle: React.CSSProperties = {
+    bottom: hasPlayBar
+      ? 'calc(var(--ad-banner-offset, 0px) + 6rem)'
+      : 'calc(var(--ad-banner-offset, 0px) + 2rem)',
+  };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 pt-6 pb-48">
+    <div
+      style={{ paddingBottom: 'calc(12rem + var(--ad-banner-offset, 0px))' }}
+      className="max-w-4xl mx-auto px-4 pt-6"
+    >
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -674,7 +675,10 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
 
       {/* Bottom Floating Action Pill */}
       {!isLocked && (
-        <div className={`fixed ${floatingBottomClass} left-0 right-0 z-30 flex justify-center pointer-events-none px-4 transition-all`}>
+        <div
+          style={floatingBottomStyle}
+          className="fixed left-0 right-0 z-30 flex justify-center pointer-events-none px-4 transition-all duration-200"
+        >
           <button
             type="button"
             onClick={() => {
