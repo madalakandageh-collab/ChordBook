@@ -16,7 +16,6 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { PersistentPlayBar } from './components/PersistentPlayBar';
 import { PracticePlayerScreen, PracticeSelectScreen } from './components/PracticeScreens';
 import { ProUpgradeModal } from './components/ProUpgradeModal';
-import { AdBannerSlot } from './components/AdBannerSlot';
 import {
   DEFAULT_SECTION_ARP,
   DEFAULT_SECTION_DRUMS,
@@ -44,6 +43,8 @@ import {
   initializeAdMob,
   initializeBillingStore,
   loadIsProFromStorage,
+  maybeShowInterstitialAd,
+  prepareInterstitialAd,
   saveIsProToStorage,
 } from './utils/capacitorBridge';
 import type {
@@ -145,21 +146,8 @@ export default function App() {
     loadFromStorage<string>(STORAGE_KEYS.activeSongId, INITIAL_SONGS[0]?.id ?? '')
   );
   const [isPro, setIsPro] = useState<boolean>(() => loadIsProFromStorage());
-  const [adBannerHeight, setAdBannerHeight] = useState(56);
   const [showProModal, setShowProModal] = useState(false);
   const [proModalReason, setProModalReason] = useState<string | null>(null);
-
-  useEffect(() => {
-    const effectiveHeight = adBannerHeight > 0 ? adBannerHeight : 56;
-    const offset = isPro ? '0px' : `${effectiveHeight + 12}px`;
-    const extra = isPro ? '0px' : '60px';
-    document.documentElement.style.setProperty('--ad-banner-offset', offset);
-    document.documentElement.style.setProperty('--ad-extra-bottom', extra);
-    return () => {
-      document.documentElement.style.removeProperty('--ad-banner-offset');
-      document.documentElement.style.removeProperty('--ad-extra-bottom');
-    };
-  }, [isPro, adBannerHeight]);
 
   const openProUpgradeModal = useCallback((reason?: string) => {
     setProModalReason(reason || null);
@@ -508,8 +496,11 @@ export default function App() {
       setSectionTransposes({});
       setHasUnsavedChanges(false);
       setScreen(targetScreen);
+      if (!isPro) {
+        void maybeShowInterstitialAd('open_song');
+      }
     },
-    [stopPlayback]
+    [stopPlayback, isPro]
   );
 
   const handleSaveSong = useCallback(() => {
@@ -845,6 +836,9 @@ export default function App() {
             setSongs((prev) => [song, ...prev]);
             setActiveSongId(song.id);
             setScreen('song-detail');
+            if (!isPro) {
+              void maybeShowInterstitialAd('save_new_song');
+            }
           }}
           onCreateSetlist={(name) => {
             setSetlists((prev) => [
@@ -1212,8 +1206,6 @@ export default function App() {
           totalBars={timeline.length || 1}
           currentBeat={currentBeat}
           chordAudioEnabled={settings.chordAudioEnabled}
-          hasAdBanner={!isPro}
-          adBannerHeight={isPro ? 0 : adBannerHeight > 0 ? adBannerHeight : 56}
           onTogglePlay={handleTogglePlay}
           onToggleChordAudio={() =>
             setSettings((prev) => ({
@@ -1224,15 +1216,6 @@ export default function App() {
           onOpenMixer={() => setShowMetronomeModal(true)}
         />
       )}
-
-      {/* Reserved Bottom Banner Ad Slot (hidden when Pro is active) */}
-      <AdBannerSlot
-        isPro={isPro}
-        onBannerHeightChange={(h) => setAdBannerHeight(h)}
-        onUpgradeClick={() =>
-          openProUpgradeModal('Upgrade to Chordbook Pro to remove all ads and unlock every feature.')
-        }
-      />
 
       {/* Upgrade to Pro Modal */}
       {showProModal && (
@@ -1248,6 +1231,9 @@ export default function App() {
             setIsPro((prev) => {
               const next = !prev;
               saveIsProToStorage(next);
+              if (!next) {
+                void prepareInterstitialAd();
+              }
               return next;
             });
           }}

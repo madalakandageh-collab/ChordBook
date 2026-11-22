@@ -5,10 +5,13 @@ export const PRO_PRODUCT_ID = 'chordbook_pro_unlock';
 
 // Replace with production AdMob Android App & Ad Unit IDs before Play Store release
 export const ADMOB_ANDROID_APP_ID = 'ca-app-pub-3940256099942544~3347511713';
-export const ADMOB_ANDROID_BANNER_ID = 'ca-app-pub-3940256099942544/6300978111';
+export const ADMOB_ANDROID_INTERSTITIAL_ID = 'ca-app-pub-3940256099942544/1033173712';
 export const ADMOB_ANDROID_REWARDED_ID = 'ca-app-pub-3940256099942544/5224354917';
 
 export const FREE_SONG_LIMIT = 20;
+const INTERSTITIAL_OPEN_COUNT_KEY = 'chordbook_interstitial_open_count_v1';
+const INTERSTITIAL_COOLDOWN_MS = 45_000;
+const INTERSTITIAL_EXPIRY_MS = 55 * 60_000;
 
 interface CdvTransactionLike {
   products?: Array<{ id?: string }>;
@@ -46,8 +49,11 @@ interface WindowWithCdvPurchase extends Window {
 
 let admobInitialized = false;
 let admobInitPromise: Promise<boolean> | null = null;
-let admobBannerVisible = false;
 let storeInitialized = false;
+let interstitialPrepared = false;
+let interstitialPreparedAt = 0;
+let interstitialPreparingPromise: Promise<boolean> | null = null;
+let lastInterstitialShownAt = 0;
 
 export function loadIsProFromStorage(): boolean {
   try {
@@ -216,6 +222,9 @@ export async function initializeAdMob(): Promise<boolean> {
         initializeForTesting: true,
       });
       admobInitialized = true;
+      if (!loadIsProFromStorage()) {
+        void prepareInterstitialAd();
+      }
       return true;
     } catch {
       admobInitPromise = null;
@@ -226,71 +235,125 @@ export async function initializeAdMob(): Promise<boolean> {
   return admobInitPromise;
 }
 
-export const DEFAULT_ADMOB_BANNER_MARGIN = 50;
+/**
+ * Preloads an AdMob Interstitial ad ahead of time so it displays smoothly on transition.
+ */
+export async function prepareInterstitialAd(): Promise<boolean> {
+  if (!isNativeCapacitorAndroid() || loadIsProFromStorage()) return false;
+  if (interstitialPrepared && Date.now() - interstitialPreparedAt < INTERSTITIAL_EXPIRY_MS) {
+    return true;
+  }
+  if (interstitialPreparingPromise) return interstitialPreparingPromise;
+
+  interstitialPreparingPromise = (async () => {
+    try {
+      const ready = await initializeAdMob();
+      if (!ready) return false;
+      const { AdMob } = await import('@capacitor-community/admob');
+      await AdMob.prepareInterstitial({
+        adId: ADMOB_ANDROID_INTERSTITIAL_ID,
+        isTesting: true,
+      });
+      interstitialPrepared = true;
+      interstitialPreparedAt = Date.now();
+      return true;
+    } catch {
+      interstitialPrepared = false;
+      return false;
+    } finally {
+      interstitialPreparingPromise = null;
+    }
+  })();
+
+  return interstitialPreparingPromise;
+}
 
 /**
- * Dynamically calculates the Android system navigation bar inset when available
- * and enforces at least 50dp bottom margin so the banner sits cleanly above it.
+ * Displays a prepared AdMob Interstitial ad and waits until the user dismisses it
+ * (or settles cleanly if unavailable). Immediately preloads the next interstitial after close.
  */
-export function getAndroidBannerBottomMargin(): number {
-  if (!isNativeCapacitorAndroid() || typeof document === 'undefined') {
-    return 0;
-  }
-  try {
-    const probe = document.createElement('div');
-    probe.style.position = 'fixed';
-    probe.style.bottom = '0';
-    probe.style.height = 'env(safe-area-inset-bottom, 0px)';
-    probe.style.pointerEvents = 'none';
-    probe.style.visibility = 'hidden';
-    document.body.appendChild(probe);
-    const measured = Math.ceil(probe.getBoundingClientRect().height || 0);
-    probe.remove();
-    return Math.max(DEFAULT_ADMOB_BANNER_MARGIN, measured);
-  } catch {
-    return DEFAULT_ADMOB_BANNER_MARGIN;
-  }
-}
+export async function showInterstitialAd(): Promise<void> {
+  if (!isNativeCapacitorAndroid() || loadIsProFromStorage()) return;
 
-export async function showAdMobBanner(options?: {
-  adId?: string;
-  isTesting?: boolean;
-  margin?: number;
-}): Promise<void> {
-  if (!isNativeCapacitorAndroid()) return;
   try {
-    const ready = await initializeAdMob();
+    const ready = await prepareInterstitialAd();
     if (!ready) return;
-    const { AdMob, BannerAdPosition, BannerAdSize } = await import('@capacitor-community/admob');
-    const bottomMargin = options?.margin ?? getAndroidBannerBottomMargin();
-    if (!admobBannerVisible) {
-      await AdMob.showBanner({
-        adId: options?.adId ?? ADMOB_ANDROID_BANNER_ID,
-        adSize: BannerAdSize.ADAPTIVE_BANNER,
-        position: BannerAdPosition.BOTTOM_CENTER,
-        margin: bottomMargin,
-        isTesting: options?.isTesting ?? true,
-      });
-      admobBannerVisible = true;
-    } else {
-      await AdMob.resumeBanner();
-    }
+
+    const { AdMob, InterstitialAdPluginEvents } = await import('@capacitor-community/admob');
+
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      let dismissedHandle: { remove: () => Promise<void> } | null = null;
+      let failedHandle: { remove: () => Promise<void> } | null = null;
+
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        interstitialPrepared = false;
+        void dismissedHandle?.remove().catch(() => {});
+        void failedHandle?.remove().catch(() => {});
+        if (!loadIsProFromStorage()) {
+          void prepareInterstitialAd();
+        }
+        resolve();
+      };
+
+      void Promise.all([
+        AdMob.addListener(InterstitialAdPluginEvents.Dismissed, finish).then((h) => {
+          dismissedHandle = h;
+        }),
+        AdMob.addListener(InterstitialAdPluginEvents.FailedToShow, finish).then((h) => {
+          failedHandle = h;
+        }),
+      ])
+        .then(() => {
+          lastInterstitialShownAt = Date.now();
+          return AdMob.showInterstitial();
+        })
+        .catch(() => {
+          finish();
+        });
+    });
   } catch {
-    // Ignore when running outside Android runtime
+    interstitialPrepared = false;
   }
 }
 
-export async function removeAdMobBanner(): Promise<void> {
-  if (!isNativeCapacitorAndroid()) return;
-  try {
-    const { AdMob } = await import('@capacitor-community/admob');
-    if (admobBannerVisible) {
-      await AdMob.removeBanner();
-      admobBannerVisible = false;
+/**
+ * Triggers an Interstitial ad occasionally for Free users:
+ * - 'open_song': every 3rd time a song is opened
+ * - 'save_new_song': after saving a newly created song
+ * Respects a minimum cooldown so ads never appear back-to-back.
+ */
+export async function maybeShowInterstitialAd(
+  trigger: 'open_song' | 'save_new_song'
+): Promise<void> {
+  if (loadIsProFromStorage()) return;
+
+  let shouldShow = trigger === 'save_new_song';
+
+  if (trigger === 'open_song') {
+    let nextCount = 1;
+    try {
+      const prev = Number.parseInt(localStorage.getItem(INTERSTITIAL_OPEN_COUNT_KEY) || '0', 10);
+      nextCount = Number.isFinite(prev) && prev >= 0 ? prev + 1 : 1;
+      localStorage.setItem(INTERSTITIAL_OPEN_COUNT_KEY, String(nextCount));
+    } catch {
+      // Ignore storage errors
     }
-  } catch {
-    // Ignore
+    shouldShow = nextCount % 3 === 0;
   }
+
+  if (!shouldShow) {
+    void prepareInterstitialAd();
+    return;
+  }
+
+  if (Date.now() - lastInterstitialShownAt < INTERSTITIAL_COOLDOWN_MS) {
+    return;
+  }
+
+  await showInterstitialAd();
 }
 
 /**
