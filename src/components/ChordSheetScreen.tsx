@@ -34,7 +34,6 @@ import type { BarEditorMode } from './BarEditorModal';
 import { ArrangeSectionsModal } from './ArrangeSectionsModal';
 import { PrintableChordSheetModal } from './PrintableChordSheetModal';
 import {
-  formatLayerBarRangeLabel,
   SectionLayerDotsCluster,
   type SectionLayerType,
 } from './SectionMultiPadModal';
@@ -46,11 +45,6 @@ import {
   formatBarChordsSummary,
   formatLastBarCuePassPrintBadge,
   formatPassOrdinal,
-  getNormalizedArpLayers,
-  getNormalizedDrumLayers,
-  getNormalizedFxLayers,
-  getNormalizedPadLayers,
-  getNormalizedSynthLayers,
   getSongTotalBars,
   hasBeatSplits,
   parseMeterBeats,
@@ -197,7 +191,6 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
   const totalBars = getSongTotalBars(song);
   const displayKey = transposeKey(song.key, song.transpose || 0);
   const isSettingsCardOpen = barEditorMode === 'cues';
-  const showTrackDetails = synthSettings.showTrackDetailsInSections ?? true;
   const playableSections = song.sections.filter((s) => !s.isReference);
   const allSectionsCollapsed =
     playableSections.length > 0 &&
@@ -705,135 +698,48 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
             return (
               <section
                 key={section.id}
-                className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-4 sm:p-5 relative shadow-xs"
+                className="rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-subtle)] p-3.5 sm:p-5 relative shadow-xs"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="relative inline-flex items-center gap-2">
-                        <h2 className="font-serif-display text-[22px] font-bold text-[var(--text-primary)]">
-                          {section.name}
-                        </h2>
-                        <SectionLayerDotsCluster
-                          section={section}
-                          disabled={isLocked}
-                          onOpen={(layer) => onOpenSectionLayer(section.id, layer)}
-                        />
-                      </div>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="font-serif-display text-[18px] sm:text-[22px] font-bold text-[var(--text-primary)] whitespace-nowrap truncate leading-snug">
+                      {section.name}
+                    </h2>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <SectionLayerDotsCluster
+                        section={section}
+                        disabled={isLocked}
+                        onOpen={(layer) => onOpenSectionLayer(section.id, layer)}
+                      />
                       {isRepeatOn && (
-                        <span className="px-2 py-0.5 rounded-full bg-[var(--accent-amber-tint)] border border-[#E5A958]/60 text-[11px] font-bold text-[var(--accent-amber-text)] tabular-nums">
+                        <span className="px-2 py-0.5 rounded-full bg-[var(--accent-amber-tint)] border border-[#E5A958]/60 text-[10px] sm:text-[11px] font-bold text-[var(--accent-amber-text)] tabular-nums">
                           ||: :|| ×{repeatCount}
                         </span>
                       )}
-                      {showTrackDetails && (
-                        <>
-                          {getNormalizedPadLayers(section.multiPad)
-                            .filter((l) => l.enabled)
-                            .map((layer, idx) => (
-                              <button
-                                key={layer.id || idx}
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onOpenSectionLayer(section.id, 'pad');
-                                }}
-                                className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/45 text-[10px] font-semibold text-emerald-400 hover:bg-emerald-500/25 transition"
-                              >
-                                Pad {idx + 1}: {layer.tone} ·{' '}
-                                {formatLayerBarRangeLabel(layer, secBarCount)}
-                              </button>
-                            ))}
-                          {getNormalizedSynthLayers(section.synth)
-                            .filter((l) => l.enabled)
-                            .map((layer, idx) => (
-                              <button
-                                key={layer.id || idx}
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onOpenSectionLayer(section.id, 'synth');
-                                }}
-                                className="px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/45 text-[10px] font-semibold text-sky-400 hover:bg-sky-500/25 transition"
-                              >
-                                Synth {idx + 1}: {layer.tone} ·{' '}
-                                {formatLayerBarRangeLabel(layer, secBarCount)}
-                              </button>
-                            ))}
-                          {getNormalizedArpLayers(section.arp)
-                            .filter((l) => l.enabled)
-                            .map((layer, idx) => (
-                              <button
-                                key={layer.id || idx}
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onOpenSectionLayer(section.id, 'arp');
-                                }}
-                                className="px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/45 text-[10px] font-semibold text-orange-400 hover:bg-orange-500/25 transition"
-                              >
-                                Arp {idx + 1}: {layer.tone} ·{' '}
-                                {formatLayerBarRangeLabel(layer, secBarCount)}
-                              </button>
-                            ))}
-                          {section.drums?.enabled &&
-                            getNormalizedDrumLayers(section.drums)
-                              .filter((l) => l.enabled)
-                              .map((layer, idx) => (
-                                <button
-                                  key={layer.id || idx}
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onOpenSectionLayer(section.id, 'drums');
-                                  }}
-                                  className="px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/45 text-[10px] font-semibold text-rose-400 hover:bg-rose-500/25 transition"
-                                >
-                                  Drum {idx + 1}: {layer.kit} · {layer.pattern} ·{' '}
-                                  {formatLayerBarRangeLabel(layer, secBarCount)}
-                                </button>
-                              ))}
-                          {section.fx?.enabled &&
-                            getNormalizedFxLayers(section.fx)
-                              .filter((fx) => fx.enabled)
-                              .map((fx, idx) => (
-                                <button
-                                  key={fx.id || idx}
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onOpenSectionLayer(section.id, 'fx');
-                                  }}
-                                  className="px-2 py-0.5 rounded-full bg-fuchsia-500/15 border border-fuchsia-500/45 text-[10px] font-semibold text-fuchsia-400 hover:bg-fuchsia-500/25 transition"
-                                >
-                                  FX {idx + 1}: {fx.effectType} · B{fx.startBar}:{fx.startBeat} ({fx.durationBars}b)
-                                </button>
-                              ))}
-                        </>
-                      )}
                     </div>
-                    <p className="text-[13px] text-[var(--text-muted)] mt-0.5 tabular-nums">
+                    <p className="text-[12px] sm:text-[13px] text-[var(--text-muted)] mt-1 tabular-nums truncate">
                       {song.bpm} bpm · {song.timeSignature} · {secBarCount}{' '}
                       {secBarCount === 1 ? 'bar' : 'bars'}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-1 relative shrink-0">
+                  <div className="flex items-center gap-0.5 sm:gap-1 relative shrink-0">
                     <button
                       type="button"
                       onClick={() => onPlaySection(section.id)}
                       aria-label={`Play ${section.name}`}
-                      className="w-9 h-9 rounded-full hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--accent-amber-text)] flex items-center justify-center transition"
+                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--accent-amber-text)] flex items-center justify-center transition"
                     >
-                      <Play className="w-4 h-4" />
+                      <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </button>
                     <button
                       type="button"
                       disabled={isLocked}
                       onClick={() => onAddBarToSection(section.id)}
                       aria-label={`Add bar to ${section.name}`}
-                      className="w-9 h-9 rounded-full hover:bg-[var(--bg-elevated)] disabled:opacity-35 text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center transition"
+                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-[var(--bg-elevated)] disabled:opacity-35 text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center transition"
                     >
-                      <Plus className="w-4 h-4" />
+                      <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </button>
                     <button
                       type="button"
@@ -844,9 +750,9 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                         )
                       }
                       aria-label={`Options for ${section.name}`}
-                      className="w-9 h-9 rounded-full hover:bg-[var(--bg-elevated)] disabled:opacity-35 text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center transition"
+                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-[var(--bg-elevated)] disabled:opacity-35 text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center transition"
                     >
-                      <MoreVertical className="w-4 h-4" />
+                      <MoreVertical className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </button>
                     <button
                       type="button"
@@ -860,12 +766,12 @@ export const ChordSheetScreen: React.FC<ChordSheetScreenProps> = ({
                       aria-label={
                         isCollapsed ? `Expand ${section.name}` : `Collapse ${section.name}`
                       }
-                      className="w-8 h-8 rounded-full bg-[var(--bg-recessed)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center transition"
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[var(--bg-recessed)] hover:bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center justify-center transition"
                     >
                       {isCollapsed ? (
-                        <ChevronDown className="w-4 h-4" />
+                        <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       ) : (
-                        <ChevronUp className="w-4 h-4" />
+                        <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       )}
                     </button>
 
