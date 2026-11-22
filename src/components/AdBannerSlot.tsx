@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ADMOB_ANDROID_BANNER_ID,
+  getAndroidBannerBottomMargin,
   isNativeCapacitorAndroid,
   removeAdMobBanner,
   showAdMobBanner,
@@ -19,6 +20,9 @@ export const AdBannerSlot: React.FC<AdBannerSlotProps> = ({
 }) => {
   const isNative = isNativeCapacitorAndroid();
   const [nativeBannerHeight, setNativeBannerHeight] = useState(56);
+  const [nativeBottomMargin, setNativeBottomMargin] = useState(() =>
+    isNative ? getAndroidBannerBottomMargin() : 0
+  );
 
   useEffect(() => {
     if (isPro) {
@@ -27,8 +31,11 @@ export const AdBannerSlot: React.FC<AdBannerSlotProps> = ({
       return;
     }
 
-    onBannerHeightChange?.(nativeBannerHeight);
-  }, [isPro, nativeBannerHeight, onBannerHeightChange]);
+    const totalOccupiedHeight = isNative
+      ? nativeBannerHeight + nativeBottomMargin
+      : 56;
+    onBannerHeightChange?.(totalOccupiedHeight);
+  }, [isPro, isNative, nativeBannerHeight, nativeBottomMargin, onBannerHeightChange]);
 
   useEffect(() => {
     if (isPro) {
@@ -40,6 +47,9 @@ export const AdBannerSlot: React.FC<AdBannerSlotProps> = ({
     let sizeHandle: { remove: () => Promise<void> } | null = null;
 
     if (isNative) {
+      const margin = getAndroidBannerBottomMargin();
+      setNativeBottomMargin(margin);
+
       void (async () => {
         try {
           const { AdMob, BannerAdPluginEvents } = await import('@capacitor-community/admob');
@@ -71,6 +81,7 @@ export const AdBannerSlot: React.FC<AdBannerSlotProps> = ({
           await showAdMobBanner({
             adId: ADMOB_ANDROID_BANNER_ID,
             isTesting: true,
+            margin,
           });
         }
       })();
@@ -89,11 +100,10 @@ export const AdBannerSlot: React.FC<AdBannerSlotProps> = ({
     <div
       aria-label="Advertisement banner space"
       style={{
-        height: isNative
-          ? `calc(${nativeBannerHeight}px + env(safe-area-inset-bottom, 0px))`
-          : 'calc(56px + env(safe-area-inset-bottom, 0px))',
+        bottom: isNative ? `${nativeBottomMargin}px` : '0px',
+        height: isNative ? `${nativeBannerHeight}px` : 'calc(56px + env(safe-area-inset-bottom, 0px))',
       }}
-      className="fixed bottom-0 left-0 right-0 z-40 pb-[env(safe-area-inset-bottom)] bg-[var(--bg-recessed)] border-t border-[var(--border-subtle)] flex items-center justify-between px-4"
+      className="fixed left-0 right-0 z-40 pb-[env(safe-area-inset-bottom)] bg-[var(--bg-recessed)] border-t border-[var(--border-subtle)] flex items-center justify-between px-4"
     >
       {isNative ? (
         <span className="text-[11px] text-[var(--text-subtle)] mx-auto">AdMob Test Banner</span>

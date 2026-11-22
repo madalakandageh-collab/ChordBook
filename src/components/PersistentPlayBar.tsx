@@ -47,9 +47,7 @@ export const PersistentPlayBar: React.FC<PersistentPlayBarProps> = ({
     <div
       style={{
         backgroundColor: 'var(--bg-playbar)',
-        bottom: hasAdBanner
-          ? `calc(${adBannerHeight}px + env(safe-area-inset-bottom, 0px) + 12px)`
-          : '0px',
+        bottom: hasAdBanner ? `${adBannerHeight + 12}px` : '0px',
       }}
       className={`fixed left-0 right-0 z-40 backdrop-blur-md border-t border-[var(--border-subtle)] px-4 py-2.5 shadow-lg transition-[bottom] duration-200 ${
         hasAdBanner

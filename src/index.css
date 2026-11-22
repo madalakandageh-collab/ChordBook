@@ -79,16 +79,16 @@
     overscroll-behavior-y: contain;
     transition: background-color 0.2s ease, color 0.2s ease;
     padding-top: env(safe-area-inset-top, 28px);
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 80px + var(--ad-extra-bottom, 60px));
   }
 }
 
-/* Fix for Floating "+ New song" button overlapping with AdMob Banner */
+/* Fix for Floating "+ New song" button overlapping with raised AdMob Banner */
 .fixed.bottom-4,
 .fixed.bottom-5,
 .fixed.bottom-6,
 .fixed.bottom-8 {
-  bottom: 85px !important;
+  bottom: calc(85px + var(--ad-extra-bottom, 60px)) !important;
 }
 
 /* Fix for Top Header overlapping with Status Bar */

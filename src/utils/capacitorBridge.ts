@@ -226,21 +226,49 @@ export async function initializeAdMob(): Promise<boolean> {
   return admobInitPromise;
 }
 
+export const DEFAULT_ADMOB_BANNER_MARGIN = 50;
+
+/**
+ * Dynamically calculates the Android system navigation bar inset when available
+ * and enforces at least 50dp bottom margin so the banner sits cleanly above it.
+ */
+export function getAndroidBannerBottomMargin(): number {
+  if (!isNativeCapacitorAndroid() || typeof document === 'undefined') {
+    return 0;
+  }
+  try {
+    const probe = document.createElement('div');
+    probe.style.position = 'fixed';
+    probe.style.bottom = '0';
+    probe.style.height = 'env(safe-area-inset-bottom, 0px)';
+    probe.style.pointerEvents = 'none';
+    probe.style.visibility = 'hidden';
+    document.body.appendChild(probe);
+    const measured = Math.ceil(probe.getBoundingClientRect().height || 0);
+    probe.remove();
+    return Math.max(DEFAULT_ADMOB_BANNER_MARGIN, measured);
+  } catch {
+    return DEFAULT_ADMOB_BANNER_MARGIN;
+  }
+}
+
 export async function showAdMobBanner(options?: {
   adId?: string;
   isTesting?: boolean;
+  margin?: number;
 }): Promise<void> {
   if (!isNativeCapacitorAndroid()) return;
   try {
     const ready = await initializeAdMob();
     if (!ready) return;
     const { AdMob, BannerAdPosition, BannerAdSize } = await import('@capacitor-community/admob');
+    const bottomMargin = options?.margin ?? getAndroidBannerBottomMargin();
     if (!admobBannerVisible) {
       await AdMob.showBanner({
         adId: options?.adId ?? ADMOB_ANDROID_BANNER_ID,
         adSize: BannerAdSize.ADAPTIVE_BANNER,
         position: BannerAdPosition.BOTTOM_CENTER,
-        margin: 0,
+        margin: bottomMargin,
         isTesting: options?.isTesting ?? true,
       });
       admobBannerVisible = true;

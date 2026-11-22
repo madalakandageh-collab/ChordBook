@@ -277,12 +277,14 @@ export const SheetsHomeScreen: React.FC<SheetsHomeScreenProps> = ({
   const floatingBottomStyle: React.CSSProperties = {
     bottom: hasPlayBar
       ? 'calc(var(--ad-banner-offset, 0px) + 6rem)'
-      : 'calc(var(--ad-banner-offset, 0px) + 2rem)',
+      : 'calc(var(--ad-banner-offset, 0px) + 2rem + var(--ad-extra-bottom, 0px))',
   };
 
   return (
     <div
-      style={{ paddingBottom: 'calc(12rem + var(--ad-banner-offset, 0px))' }}
+      style={{
+        paddingBottom: 'calc(12rem + var(--ad-banner-offset, 0px) + var(--ad-extra-bottom, 0px))',
+      }}
       className="max-w-4xl mx-auto px-4 pt-6"
     >
       {/* Header */}

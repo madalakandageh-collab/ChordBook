@@ -150,12 +150,14 @@ export default function App() {
   const [proModalReason, setProModalReason] = useState<string | null>(null);
 
   useEffect(() => {
-    const offset = isPro
-      ? '0px'
-      : `calc(${adBannerHeight > 0 ? adBannerHeight : 56}px + env(safe-area-inset-bottom, 0px) + 12px)`;
+    const effectiveHeight = adBannerHeight > 0 ? adBannerHeight : 56;
+    const offset = isPro ? '0px' : `${effectiveHeight + 12}px`;
+    const extra = isPro ? '0px' : '60px';
     document.documentElement.style.setProperty('--ad-banner-offset', offset);
+    document.documentElement.style.setProperty('--ad-extra-bottom', extra);
     return () => {
       document.documentElement.style.removeProperty('--ad-banner-offset');
+      document.documentElement.style.removeProperty('--ad-extra-bottom');
     };
   }, [isPro, adBannerHeight]);
 
